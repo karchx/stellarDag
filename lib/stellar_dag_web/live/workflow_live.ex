@@ -17,8 +17,9 @@ defmodule StellarDAGWeb.WorkflowLive do
   end
 
   def handle_event("update_node_position", %{"id" => id, "x" => x, "y" => y}, socket) do
-    jobs = Enum.map(socket.assigns.jobs, fn job ->
-      if job.id == id, do: %{job | x: max(0, round(x)), y: max(0, round(y))}, else: job
+    jobs = Enum.map(socket.assigns.jobs, fn
+      %{id: ^id} = job -> %{job | x: max(0, round(x)), y: max(0, round(y))}
+      job -> job
     end)
     Phoenix.PubSub.broadcast(StellarDAG.PubSub, "workflow", {:sync_jobs, jobs})
     {:noreply, assign(socket, jobs: jobs)}

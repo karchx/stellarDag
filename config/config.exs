@@ -7,10 +7,10 @@
 # General application configuration
 import Config
 
-config :stellar_dag,
-  namespace: StellarDAG,
-  ecto_repos: [StellarDAG.Repo],
-  generators: [timestamp_type: :utc_datetime]
+# config :stellar_dag,
+#   namespace: StellarDAG,
+#   ecto_repos: [StellarDAG.Repo],
+#   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
 config :stellar_dag, StellarDAGWeb.Endpoint,

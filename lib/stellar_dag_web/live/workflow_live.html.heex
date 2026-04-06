@@ -1,0 +1,132 @@
+<div class="flex flex-col h-screen bg-gray-950 text-gray-100 overflow-hidden relative">
+  <header class="border-b border-gray-800 bg-gray-950 px-6 py-4 flex items-center justify-between z-20">
+    <div>
+      <h1 class="text-xl font-semibold text-white">Kubernetes Job Workflow</h1>
+      <p class="text-sm text-gray-400">Conecta jobs para definir el orden de ejecución</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button class="px-4 py-2 text-sm bg-transparent border border-gray-700 hover:bg-gray-800 rounded-md transition-colors">Exportar YAML</button>
+      <button class="px-4 py-2 text-sm bg-green-600 hover:bg-green-500 text-white rounded-md transition-colors font-medium">▶ Ejecutar</button>
+    </div>
+  </header>
+
+  <div class="border-b border-gray-800 bg-gray-900/50 px-6 py-2 flex items-center justify-between z-20">
+    <button phx-click="open_dialog" class="px-3 py-1.5 text-sm border border-gray-700 bg-gray-900 hover:bg-gray-800 rounded-md flex items-center transition-colors">
+      <span class="mr-2">+</span> Nuevo Job
+    </button>
+  </div>
+
+  <div class="flex-1 relative cursor-grab bg-[radial-gradient(circle_at_1px_1px,_#334155_1px,_transparent_0)] bg-[length:24px_24px]" id="canvas" phx-hook="WorkflowCanvas" data-zoom={@zoom} data-pan-x={@pan_x} data-pan-y={@pan_y}>
+    <div id="viewport" class="absolute inset-0 origin-top-left" style={"transform: translate(#{@pan_x}px, #{@pan_y}px) scale(#{@zoom})"}>
+      <svg class="absolute inset-0 pointer-events-none" style="width: 4000px; height: 4000px;">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22c55e" />
+          </marker>
+        </defs>
+        <g class="pointer-events-auto">
+          <%= for conn <- get_connections(@jobs) do %>
+            <path 
+              d={bezier_path(conn.from, conn.to)} 
+              fill="none" 
+              stroke="transparent" 
+              stroke-width="15" 
+              class="cursor-pointer hover:stroke-red-500/30 transition-colors duration-200"
+              phx-click="remove_connection"
+              phx-value-from={conn.from.id}
+              phx-value-to={conn.to.id}
+            />
+            <path 
+              class="edge-path pointer-events-none"
+              data-from={conn.from.id} 
+              data-to={conn.to.id}
+              d={bezier_path(conn.from, conn.to)} 
+              fill="none" 
+              stroke="#22c55e" 
+              stroke-width="2" 
+              marker-end="url(#arrowhead)" 
+            />
+          <% end %>
+          <path id="temp-connection" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5 5" class="hidden" />
+        </g>
+      </svg>
+
+      <%= for job <- @jobs do %>
+        <% {text_color, bg_color} = status_color(job.status) %>
+        <div id={"node-#{job.id}"} data-id={job.id} class="node absolute cursor-move select-none w-56 rounded-lg border border-gray-800 bg-gray-900 p-3 shadow-lg hover:ring-2 ring-gray-700 transition-all" style={"left: #{job.x}px; top: #{job.y}px;"}>
+          <div class="connect-target absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-500 border-2 border-gray-900 cursor-crosshair z-10 hover:scale-125 transition-transform" data-id={job.id}></div>
+          <div class="connect-source absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-green-500 border-2 border-gray-900 cursor-crosshair z-10 hover:scale-125 transition-transform" data-id={job.id}></div>
+
+          <div class="flex items-center gap-2 mb-2">
+            <div class={"p-1.5 rounded #{bg_color}"}>
+              <div class={"w-4 h-4 rounded-sm #{bg_color}"}></div>
+            </div>
+            <span class="font-medium text-sm truncate"><%= job.name %></span>
+          </div>
+
+          <div class="space-y-1 text-xs text-gray-400">
+            <div class="flex justify-between"><span>Namespace:</span><span class="font-mono text-gray-200"><%= job.namespace %></span></div>
+            <div class="flex justify-between"><span>Imagen:</span><span class="font-mono text-gray-200 truncate max-w-[100px]"><%= job.image %></span></div>
+          </div>
+
+          <div class={"inline-flex items-center mt-2 px-2 py-1 rounded text-xs font-medium #{bg_color} #{text_color}"}>
+            <%= String.capitalize(job.status) %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%= if @show_dialog do %>
+    <div class="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div class="bg-gray-900 border border-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6" phx-click-away="close_dialog">
+        <h2 class="text-xl font-semibold text-white mb-1">Nuevo Job de Kubernetes</h2>
+        <p class="text-sm text-gray-400 mb-6">Configura los parámetros del Job y sus dependencias</p>
+        
+        <form phx-submit="save_job" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Nombre del Job</label>
+            <input type="text" name="job[name]" required placeholder="mi-job" class="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Namespace</label>
+            <input type="text" name="job[namespace]" required value="default" class="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Imagen</label>
+            <input type="text" name="job[image]" required placeholder="nginx:latest" class="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Estado Inicial</label>
+            <select name="job[status]" class="w-full bg-gray-950 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <option value="pending">Pendiente</option>
+              <option value="running">Ejecutando</option>
+              <option value="completed">Completado</option>
+              <option value="failed">Fallido</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Jobs Predecesores</label>
+            <div class="max-h-32 overflow-y-auto space-y-2 border border-gray-800 rounded p-2 bg-gray-950">
+              <%= for existing_job <- @jobs do %>
+                <label class="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-900 p-1 rounded">
+                  <input type="checkbox" name="job[predecessors][]" value={existing_job.id} class="rounded border-gray-700 text-blue-600 focus:ring-blue-500 bg-gray-900" />
+                  <span><%= existing_job.name %></span>
+                </label>
+              <% end %>
+              <%= if Enum.empty?(@jobs) do %>
+                 <span class="text-xs text-gray-500">No hay jobs disponibles.</span>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-800">
+            <button type="button" phx-click="close_dialog" class="px-4 py-2 text-sm bg-transparent border border-gray-700 hover:bg-gray-800 rounded transition-colors">Cancelar</button>
+            <button type="submit" class="px-4 py-2 text-sm bg-white text-black font-medium hover:bg-gray-200 rounded transition-colors">Crear Job</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  <% end %>
+</div>

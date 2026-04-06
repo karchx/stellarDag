@@ -1,23 +1,3 @@
-// If you want to use Phoenix channels, run `mix help phx.gen.channel`
-// to get started and then uncomment the line below.
-// import "./user_socket.js"
-
-// You can include dependencies in two ways.
-//
-// The simplest option is to put them in assets/vendor and
-// import them using relative paths:
-//
-//     import "../vendor/some-package.js"
-//
-// Alternatively, you can `npm install some-package --prefix assets` and import
-// them using a path starting with the package name:
-//
-//     import "some-package"
-//
-// If you have dependencies that try to import CSS, esbuild will generate a separate `app.css` file.
-// To load it, simply add a second `<link>` to your `root.html.heex` file.
-
-// Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
 import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
 import {Socket} from "phoenix"
@@ -25,11 +5,121 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/stellar_dag"
 import topbar from "../vendor/topbar"
 
+let hooksDAG = {};
+
+hooksDAG.WorkflowCanvas = {
+  mounted() {
+    this.canvas = this.el;
+    this.viewport = this.el.querySelector('#viewport');
+    this.tempPath = this.el.querySelector('#temp-connection');
+    
+    this.zoom = parseFloat(this.el.dataset.zoom) || 1;
+    this.pan = { x: parseFloat(this.el.dataset.panX) || 0, y: parseFloat(this.el.dataset.panY) || 0 };
+    
+    this.dragState = { type: null };
+
+    this.bindEvents();
+  },
+
+  bindEvents() {
+    this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+    window.addEventListener('mousemove', (e) => this.onMouseMove(e));
+    window.addEventListener('mouseup', (e) => this.onMouseUp(e));
+  },
+
+  onMouseDown(e) {
+    if (e.target.closest('.connect-source')) {
+      e.stopPropagation();
+      const nodeId = e.target.closest('.connect-source').dataset.id;
+      const nodeEl = this.el.querySelector(`#node-${nodeId}`);
+      this.dragState = { type: 'connect', sourceId: nodeId, sourceNode: nodeEl };
+      this.tempPath.classList.remove('hidden');
+      return;
+    }
+
+    const node = e.target.closest('.node');
+    if (node) {
+      e.stopPropagation();
+      const rect = node.getBoundingClientRect();
+      this.dragState = {
+        type: 'node',
+        element: node,
+        id: node.dataset.id,
+        offsetX: (e.clientX - rect.left) / this.zoom,
+        offsetY: (e.clientY - rect.top) / this.zoom
+      };
+      return;
+    }
+
+    this.canvas.style.cursor = 'grabbing';
+    this.dragState = { type: 'pan', startX: e.clientX - this.pan.x, startY: e.clientY - this.pan.y };
+  },
+
+  onMouseMove(e) {
+    if (!this.dragState.type) return;
+
+    if (this.dragState.type === 'node') {
+      const canvasRect = this.canvas.getBoundingClientRect();
+      let x = (e.clientX - canvasRect.left - this.pan.x) / this.zoom - this.dragState.offsetX;
+      let y = (e.clientY - canvasRect.top - this.pan.y) / this.zoom - this.dragState.offsetY;
+      
+      this.dragState.element.style.left = `${Math.max(0, x)}px`;
+      this.dragState.element.style.top = `${Math.max(0, y)}px`;
+    } 
+    else if (this.dragState.type === 'pan') {
+      this.pan.x = e.clientX - this.dragState.startX;
+      this.pan.y = e.clientY - this.dragState.startY;
+      this.updateViewport();
+    }
+    else if (this.dragState.type === 'connect') {
+      const canvasRect = this.canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - canvasRect.left - this.pan.x) / this.zoom;
+      const mouseY = (e.clientY - canvasRect.top - this.pan.y) / this.zoom;
+      
+      const sourceX = parseFloat(this.dragState.sourceNode.style.left) + 224;
+      const sourceY = parseFloat(this.dragState.sourceNode.style.top) + 60;
+
+      const cp1X = sourceX + Math.abs(mouseX - sourceX) * 0.4;
+      const cp2X = mouseX - Math.abs(mouseX - sourceX) * 0.4;
+
+      this.tempPath.setAttribute('d', `M ${sourceX} ${sourceY} C ${cp1X} ${sourceY}, ${cp2X} ${mouseY}, ${mouseX} ${mouseY}`);
+    }
+  },
+
+  onMouseUp(e) {
+    if (!this.dragState.type) return;
+
+    if (this.dragState.type === 'node') {
+      const x = parseFloat(this.dragState.element.style.left);
+      const y = parseFloat(this.dragState.element.style.top);
+      this.pushEvent("update_node_position", { id: this.dragState.id, x, y });
+    } 
+    else if (this.dragState.type === 'pan') {
+      this.canvas.style.cursor = 'grab';
+      this.pushEvent("update_viewport", { pan_x: this.pan.x, pan_y: this.pan.y, zoom: this.zoom });
+    }
+    else if (this.dragState.type === 'connect') {
+      this.tempPath.classList.add('hidden');
+      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.node');
+      
+      if (target && target.dataset.id !== this.dragState.sourceId) {
+        this.pushEvent("add_connection", { from: this.dragState.sourceId, to: target.dataset.id });
+      }
+    }
+
+    this.dragState = { type: null };
+  },
+
+  updateViewport() {
+    this.viewport.style.transform = `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.zoom})`;
+  }
+};
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, ...hooksDAG},
 })
 
 // Show progress bar on live navigation and form submits

@@ -17,7 +17,7 @@ defmodule StellarDAGWeb.Router do
   scope "/", StellarDAGWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", WorkflowLive
   end
 
   # Other scopes may use custom stacks.

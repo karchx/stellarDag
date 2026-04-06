@@ -9,7 +9,7 @@ defmodule StellarDAG.Application do
   def start(_type, _args) do
     children = [
       StellarDAGWeb.Telemetry,
-      StellarDAG.Repo,
+      # StellarDAG.Repo,
       {DNSCluster, query: Application.get_env(:stellar_dag, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: StellarDAG.PubSub},
       # Start a worker by calling: StellarDAG.Worker.start_link(arg)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,14 @@ import (
 
 // {id: "1", name: "gaia_source", namespace: "ds", image: "go-parquet:1.0.0", status: "completed", predecessors: [], x: 80, y: 120}
 type EventStellar struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Namespace    string   `json:"namespace"`
+	Image        string   `json:"image"`
+	Status       string   `json:"status"`
+	Predecessors []string `json:"predecessors"`
+	X            int      `json:"x"`
+	Y            int      `json:"y"`
 }
 
 func sparkApp() schema.GroupVersionResource {
@@ -29,9 +38,34 @@ func sparkApp() schema.GroupVersionResource {
 func getStatusDynamic(object map[string]any) string {
 	status, found, err := unstructured.NestedString(object, "status", "applicationState", "state")
 	if err != nil || !found {
-		return "status not found"
+		return "IN_QUEUE"
 	}
 	return fmt.Sprintf("%v", status)
+}
+
+func printEvent(u *unstructured.Unstructured) {
+	status := getStatusDynamic(u.Object)
+
+	image, _, _ := unstructured.NestedString(u.Object, "spec", "image")
+
+	event := EventStellar{
+		ID:           string(u.GetUID()),
+		Name:         u.GetName(),
+		Namespace:    u.GetNamespace(),
+		Image:        image,
+		Status:       status,
+		Predecessors: []string{},
+		X:            80,
+		Y:            120,
+	}
+
+	jsonData, err := json.MarshalIndent(event, "", "    ")
+	if err != nil {
+		fmt.Printf("Error marshaling event: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Event: %s\n", string(jsonData))
 }
 
 func main() {
@@ -63,16 +97,15 @@ func main() {
 	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			u := obj.(*unstructured.Unstructured)
-			fmt.Printf("ADD: [%s] %s\n", u.GetNamespace(), u.GetName())
+			printEvent(u)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			u := newObj.(*unstructured.Unstructured)
-			status := getStatusDynamic(u.Object)
-			fmt.Printf("UPDATE: [%s] %s - status: %s\n", u.GetNamespace(), u.GetName(), status)
+			printEvent(u)
 		},
 		DeleteFunc: func(obj any) {
 			u := obj.(*unstructured.Unstructured)
-			fmt.Printf("DELETE: [%s] %s\n", u.GetNamespace(), u.GetName())
+			printEvent(u)
 		},
 	})
 

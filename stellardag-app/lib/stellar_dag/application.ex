@@ -15,7 +15,8 @@ defmodule StellarDAG.Application do
       # Start a worker by calling: StellarDAG.Worker.start_link(arg)
       # {StellarDAG.Worker, arg},
       # Start to serve requests, typically the last entry
-      StellarDAGWeb.Endpoint
+      StellarDAGWeb.Endpoint,
+      StellarDAG.K8sInformer
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

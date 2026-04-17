@@ -12,11 +12,13 @@ defmodule StellarDAG.Application do
       # StellarDAG.Repo,
       {DNSCluster, query: Application.get_env(:stellar_dag, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: StellarDAG.PubSub},
-      # Start a worker by calling: StellarDAG.Worker.start_link(arg)
-      # {StellarDAG.Worker, arg},
-      # Start to serve requests, typically the last entry
-      StellarDAGWeb.Endpoint,
-      StellarDAG.K8sInformer
+      %{
+        id: Boltx,
+        start: {Boltx, :start_link, [Application.get_env(:boltx, Bolt)] },
+      },
+      StellarDAG.K8sInformer,
+      StellarDAG.Neo4Syncer,
+      StellarDAGWeb.Endpoint
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

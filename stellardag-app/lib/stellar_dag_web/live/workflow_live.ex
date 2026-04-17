@@ -67,7 +67,8 @@ defmodule StellarDAGWeb.WorkflowLive do
   def handle_event("open_dialog", _, socket), do: {:noreply, assign(socket, show_dialog: true)}
   def handle_event("close_dialog", _, socket), do: {:noreply, assign(socket, show_dialog: false)}
 
-  def handle_event("save_job", %{"job" => job_params}, socket) do
+  # TODO: calculate new y with length of predecessors to avoid overlap
+  def handle_event("save_job", %{"job" => job_params}, %{assigns: %{jobs: current_jobs}} = socket) do
     new_job = %{
       id: :crypto.strong_rand_bytes(4) |> Base.encode16(),
       name: job_params["name"],
@@ -75,13 +76,13 @@ defmodule StellarDAGWeb.WorkflowLive do
       image: job_params["image"],
       status: job_params["status"],
       predecessors: Map.get(job_params, "predecessors", []),
-      x: 100,
+      x: 370 + length(current_jobs) * 20,
       y: 100
     }
 
-    jobs = socket.assigns.jobs ++ [new_job]
-    Phoenix.PubSub.broadcast(StellarDAG.PubSub, "workflow", {:sync_jobs, jobs})
-    {:noreply, assign(socket, jobs: jobs, show_dialog: false)}
+    updated_jobs = current_jobs ++ [new_job]
+    Phoenix.PubSub.broadcast(StellarDAG.PubSub, "workflow", {:sync_jobs, updated_jobs})
+    {:noreply, assign(socket, jobs: updated_jobs, show_dialog: false)}
   end
 
   defp format_k8s_job(incoming_job) do
@@ -92,8 +93,8 @@ defmodule StellarDAGWeb.WorkflowLive do
       image: incoming_job["image"],
       status: normalize_status(incoming_job["status"]),
       predecessors: incoming_job["predecessors"] || [],
-      x: incoming_job["x"] || 180,
-      y: incoming_job["y"] || 10,
+      x: incoming_job["x"] || 100,
+      y: incoming_job["y"] || 100,
     }
   end
 
@@ -102,12 +103,12 @@ defmodule StellarDAGWeb.WorkflowLive do
       Enum.map(jobs, fn 
         %{id: id} = existing when id == new_job.id ->
           %{existing |
-            id: new_job.id,
+            # id: new_job.id,
             name: new_job.name,
             namespace: new_job.namespace,
             image: new_job.image,
             status: new_job.status,
-            predecessors: new_job.predecessors
+            # predecessors: new_job.predecessors
           }
         existing -> existing
       end)

@@ -1,5 +1,14 @@
 import Config
 
+config :boltx, Bolt,
+  uri: System.get_env("NEO4J_URL") || "bolt://localhost:7687",
+  auth: [username: "neo4j", password: "changeme123"],
+  user_agent: "boltxTest/1",
+  pool_size: 15,
+  max_overflow: 3,
+  prefix: :default,
+  name: Bolt
+
 # Configure your database
 # config :stellar_dag, StellarDAG.Repo,
 #   username: "postgres",

@@ -25,8 +25,6 @@ type EventStellar struct {
 	Image        string   `json:"image"`
 	Status       string   `json:"status"`
 	Predecessors []string `json:"predecessors"`
-	X            int      `json:"x"`
-	Y            int      `json:"y"`
 }
 
 func sparkApp() schema.GroupVersionResource {
@@ -72,8 +70,6 @@ func printEventJob(job *batchv1.Job, simpleFormat *bool) {
 		Image:        image,
 		Status:       status,
 		Predecessors: []string{},
-		X:            80,
-		Y:            120,
 	}
 
 	if simpleFormat != nil && *simpleFormat {
@@ -107,8 +103,6 @@ func printEvent(u *unstructured.Unstructured) {
 		Image:        image,
 		Status:       status,
 		Predecessors: []string{},
-		X:            80,
-		Y:            120,
 	}
 
 	jsonData, err := json.MarshalIndent(event, "", "    ")
@@ -119,62 +113,6 @@ func printEvent(u *unstructured.Unstructured) {
 
 	fmt.Printf("Event: %s\n", string(jsonData))
 }
-
-// func main() {
-// 	stopCh := make(chan struct{})
-//
-// 	kubeconfig := filepath.Join(homeDir(), ".kube", "config")
-// 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-//
-// 	// clientset, err := kubernetes.NewForConfig(config)
-// 	dynamicClient, err := dynamic.NewForConfig(config)
-//
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-//
-// 	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
-// 		dynamicClient,
-// 		15*time.Second,
-// 		"de",
-// 		nil,
-// 	)
-//
-// 	gvr := sparkApp()
-// 	informer := factory.ForResource(gvr).Informer()
-//
-// 	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-// 		AddFunc: func(obj any) {
-// 			u := obj.(*unstructured.Unstructured)
-// 			printEvent(u)
-// 		},
-// 		UpdateFunc: func(oldObj, newObj any) {
-// 			u := newObj.(*unstructured.Unstructured)
-// 			printEvent(u)
-// 		},
-// 		DeleteFunc: func(obj any) {
-// 			u := obj.(*unstructured.Unstructured)
-// 			printEvent(u)
-// 		},
-// 	})
-//
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-//
-// 	factory.Start(stopCh)
-//
-// 	if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
-// 		panic("timout waiting for cache to sync")
-// 	}
-//
-// 	fmt.Println("Cache synced, watching for events...")
-//
-// 	<-stopCh
-// }
 
 func main() {
 	simpleFormat := flag.Bool("simple", false, "Use simple format for events")

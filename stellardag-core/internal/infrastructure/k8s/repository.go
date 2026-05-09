@@ -28,17 +28,14 @@ func NewRepository(factory informers.SharedInformerFactory) *EventRepository {
 	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			jobAdd := obj.(*batchv1.Job)
-			log.Infof("[ADD]: %v", jobAdd)
 			repo.broadcast(*domain.NewEventStellar(jobAdd))
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			jobUpdate := newObj.(*batchv1.Job)
-			log.Infof("[UPDATE]: %v", jobUpdate)
 			repo.broadcast(*domain.NewEventStellar(jobUpdate))
 		},
 		DeleteFunc: func(obj any) {
 			jobDelete := obj.(*batchv1.Job)
-			log.Infof("[DELETE]: %v", jobDelete)
 			repo.broadcast(*domain.NewEventStellar(jobDelete))
 		},
 	})

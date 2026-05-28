@@ -9,15 +9,11 @@ defmodule StellarDAG.Application do
   def start(_type, _args) do
     children = [
       StellarDAGWeb.Telemetry,
-      # StellarDAG.Repo,
+      StellarDAG.Repo,
       {DNSCluster, query: Application.get_env(:stellar_dag, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: StellarDAG.PubSub},
-      %{
-        id: Boltx,
-        start: {Boltx, :start_link, [Application.get_env(:boltx, Bolt)] },
-      },
-      StellarDAG.K8sInformer,
-      StellarDAG.Neo4Syncer,
+      # StellarDAG.K8sInformer,
+      # StellarDAG.Neo4Syncer,
       StellarDAGWeb.Endpoint
     ]
 

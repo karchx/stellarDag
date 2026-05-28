@@ -65,8 +65,7 @@ defmodule StellarDAG.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"},
-      {:boltx, "~> 0.0.6"}
+      {:bandit, "~> 1.5"}
     ]
   end
 

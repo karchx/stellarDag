@@ -1,23 +1,14 @@
 import Config
 
-config :boltx, Bolt,
-  uri: System.get_env("NEO4J_URL") || "bolt://localhost:7687",
-  auth: [username: "neo4j", password: "changeme123"],
-  user_agent: "boltxTest/1",
-  pool_size: 15,
-  max_overflow: 3,
-  prefix: :default,
-  name: Bolt
-
 # Configure your database
-# config :stellar_dag, StellarDAG.Repo,
-#   username: "postgres",
-#   password: "postgres",
-#   hostname: "localhost",
-#   database: "stellar_dag_dev",
-#   stacktrace: true,
-#   show_sensitive_data_on_connection_error: true,
-#   pool_size: 10
+config :stellar_dag, StellarDAG.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "stellar_dag",
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

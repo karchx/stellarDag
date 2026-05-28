@@ -5,10 +5,15 @@
     {mod, {stellar_core_app, []}},
     {applications, [
         kernel,
-        stdlib
+        stdlib,
+        cowboy
     ]},
     {env, []},
-    {modules, []},
+    {modules, [
+        stellar_core_app,
+        stellar_core_sub,
+        web_server_handler
+    ]},
     {licenses, ["Apache-2.0"]},
     {links, []}
  ]}.

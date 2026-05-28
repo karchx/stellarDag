@@ -19,7 +19,7 @@ handle_request(_, _Req, _State) ->
 init(Req, State) ->
     Path = maps:get(path, State, <<"home">>),
     Res = handle_request(Path, Req, State),
-    {ok, Req2} = cowboy_req:reply(200,
+    Req2 = cowboy_req:reply(200,
         #{<<"content-type">> => <<"text/plain">>},
         Res,
         Req),

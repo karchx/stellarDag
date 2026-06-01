@@ -1,8 +1,3 @@
-%%%-------------------------------------------------------------------
-%% @doc stellar_core top level supervisor.
-%% @end
-%%%-------------------------------------------------------------------
-
 -module(stellar_core_sup).
 
 -behaviour(supervisor).
@@ -28,6 +23,9 @@ init([]) ->
           type => supervisor},
         #{id => worker_pool,
           start => {worker_pool, start_link, [[{max_workers, 3}]]},
+          type => worker},
+        #{id => job_scheduler,
+          start => {job_scheduler, start_link, []},
           type => worker}
     ],
     {ok, {SupFlags, ChildSpecs}}.

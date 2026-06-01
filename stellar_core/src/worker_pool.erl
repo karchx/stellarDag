@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %% API - called
--export([start_link/1, request_worker/0, release_worker/1, execute/3]).
+-export([start_link/1, request_worker/0, release_worker/1, execute/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, handle_continue/2, terminate/2, code_change/3]).
@@ -29,9 +29,9 @@ request_worker() ->
 release_worker(WorkerPid) ->
     gen_server:cast(?SERVER, {release_worker, WorkerPid}).
 
--spec execute(pid(), term(), pid()) -> ok.
-execute(WorkerPid, JobId, FsmPid) ->
-    gen_server:cast(WorkerPid, {execute, JobId, FsmPid}).
+-spec execute(pid(), term(), term(), pid()) -> ok.
+execute(WorkerPid, JobId, Payload, FsmPid) ->
+    gen_server:cast(WorkerPid, {execute, JobId, Payload, FsmPid}).
 
 %% ===== CALLBACKS =====
 init(Opts) ->

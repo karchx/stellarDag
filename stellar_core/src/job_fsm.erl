@@ -8,6 +8,7 @@
 
 -record(data, {
     job_id,
+    payload,
     orchestrator_pid,
     worker_pid = undefined,
     worker_mon = undefined, %ref monitor
@@ -30,6 +31,7 @@ callback_mode() -> handle_event_function.
 init(Opts) ->
     Data = #data{
         job_id = proplists:get_value(job_id, Opts),
+        payload = proplists:get_value(payload, Opts),
         orchestrator_pid = proplists:get_value(orchestrator_pid, Opts),
         max_retries = proplists:get_value(max_retries, Opts, 3),
         base_backoff = proplists:get_value(base_backoff, Opts, 1000)
@@ -58,7 +60,7 @@ handle_event(cast, {worker_assigned, WorkerPid}, queue, Data) ->
 
 %% State starting
 handle_event(internal, start_execution, starting, Data) ->
-    worker_pool:execute(Data#data.worker_pid, Data#data.job_id, self()),
+    worker_pool:execute(Data#data.worker_pid, Data#data.job_id, Data#data.payload, self()),
     {next_state, active, Data};
 %% State active
 handle_event(cast, {job_result, success}, active, Data) ->
@@ -71,10 +73,12 @@ handle_event(cast, {job_result, error}, active, Data) ->
     NextRetry = Data#data.retries + 1,
     case NextRetry > Data#data.max_retries of
         true ->
+            error_logger:error_msg("[job_fsm] Job ~p max retries. Abort ~n", [Data#data.job_id]),
             notify_orchestrator(Data, abort),
             {stop, {shutdown, abort}, Data};
         false ->
             Timeout = Data#data.base_backoff * (1 bsl Data#data.retries),
+            error_logger:warning_msg("[job_fsm] Job ~p failed, Retry ~p/~p", [Data#data.job_id, NextRetry, Data#data.max_retries]),
             {next_state, retry_delay, Data#data{retries = NextRetry, worker_pid = undefined},
             [{state_timeout, Timeout, backoff_expired}]}
     end;

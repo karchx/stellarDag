@@ -1,6 +1,7 @@
 # TODO
 
-- [ ] add connection postgres
+- [x] add connection postgres
 - [ ] save result jobs
-- [ ] return json info jobs
-- [ ] connection ws frontend
+- [x] return json info jobs
+- [x] connection ws frontend
+- [ ] add job_fsm_sup and not use `start_link` in job_scheduler, use `simple_one_for_one` in sup

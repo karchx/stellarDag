@@ -12,6 +12,7 @@
 start(_StartType, _StartArgs) ->
     Dispatch = cowboy_router:compile([
         { '_', [
+            {"/ws", ws_handler, []},
             {"/", web_server_handler, #{path => <<"home">>}},
             {"/random", web_server_handler, #{path => <<"random">>}},
             {"/time", web_server_handler, #{path => <<"time">>}}

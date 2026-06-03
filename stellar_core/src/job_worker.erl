@@ -30,7 +30,7 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 do_work(JobId, {bash, Command}) ->
     error_logger:info_msg("[job_worker] executing job ~p~n", [JobId]),
-    Port = erlang:open_port({spawn, "bash -c '" ++ Command ++ "'"}, [stream, in, exit_status]),
+    Port = erlang:open_port({spawn, "bash -c \"" ++ Command ++ "\""}, [stream, exit_status]),
     wait_for_port(Port, JobId).
 
 wait_for_port(Port, JobId) ->
@@ -42,6 +42,14 @@ wait_for_port(Port, JobId) ->
             success;
         {Port, {exit_status, Status}} ->
             error_logger:error_msg("[job_worker] [Job: ~p] Failed status ~p~n", [JobId, Status]),
+            flush_port_close(Port),
             error
+    end.
+
+flush_port_close(Port) ->
+    receive
+        {Port, closed} -> ok
+    after 0 -> 
+        ok
     end.
 

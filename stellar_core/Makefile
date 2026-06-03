@@ -12,7 +12,7 @@ clean:
 	@( $(REBAR) clean)
 
 test:
-	erlc -DTEST src/workflow_fsm.erl
-	erl -noshell -eval "eunit:test(workflow_fsm, [verbose])" -s init stop
+	erlc -DTEST src/job_fsm.erl
+	erl -noshell -eval "eunit:test(job_fsm, [verbose])" -s init stop
 
 .PHONY: all, deps, compile

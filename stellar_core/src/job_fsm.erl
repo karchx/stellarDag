@@ -2,7 +2,7 @@
 -behaviour(gen_statem).
 
 %% API
--export([start_link/1, assign_worker/2, job_finished/2]).
+-export([start_link/1, assign_worker/2, job_finished/2, get_state/1]).
 
 -export([init/1, callback_mode/0, handle_event/4, terminate/3]).
 
@@ -26,7 +26,14 @@ assign_worker(Pid, WorkerPid) ->
 job_finished(Pid, Result) ->
     gen_statem:cast(Pid, {job_result, Result}).
 
-callback_mode() -> handle_event_function.
+callback_mode() -> 
+    [handle_event_function, state_enter].
+
+get_state(JobId) ->
+    case ets:lookup(job_states, JobId) of
+        [{JobId, State}] -> {ok, State};
+        [] -> {error, not_found}
+    end.
 
 init(Opts) ->
     Data = #data{
@@ -51,6 +58,13 @@ handle_event(internal, request_worker, ready, Data) ->
             {next_state, queue, Data}
     end;
 
+
+handle_event(enter, _OldState, State, Data) ->
+    ets:insert(job_states, {Data#data.job_id, State}),
+    %% Broadcast all ws
+    [Pid ! {job_update, Data#data.job_id, State} || Pid <- pg:get_members(ws_clients)],
+
+    keep_state_and_data;
 
 %% State queue
 handle_event(cast, {worker_assigned, WorkerPid}, queue, Data) ->

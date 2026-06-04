@@ -1,9 +1,8 @@
 -module(db_worker).
 -behaviour(gen_server).
 
--export([start_link/0, fetch_and_lock_job/0, mark_job_done/2, setup_table/1]).
+-export([start_link/0, fetch_and_lock_job/0, mark_job_done/2, execute_query/2, setup_table/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
-
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -20,7 +19,6 @@ init([]) ->
     setup_table(Conn),
     {ok, Conn}.
 
-
 %% ====== API =====
 -spec fetch_and_lock_job() -> {ok, pid()} | {error, pool_exhausted}.
 fetch_and_lock_job() ->
@@ -29,6 +27,13 @@ fetch_and_lock_job() ->
 -spec mark_job_done(pid(), term()) -> {ok, pid()} | {error, pool_exhausted}.
 mark_job_done(JobId, Result) ->
     gen_server:call(?MODULE, {mark_job_done, JobId, Result}).
+
+execute_query(Query, Params) ->
+    gen_server:call(?MODULE, {execute_query, Query, Params}).
+
+handle_call({execute_query, Query, Params}, _From, Conn) ->
+    {ok, _} = epgsql:equery(Conn, Query, Params),
+    {reply, ok, Conn};
 
 handle_call(fetch_and_lock_job, _From, Conn) ->
     Query = """
@@ -60,4 +65,22 @@ handle_info(_Info, Conn) -> {noreply, Conn}.
 
 setup_table(Conn) ->
     epgsql:squery(Conn,
-        "CREATE TABLE IF NOT EXISTS jobs_queue (id UUID PRIMARY KEY DEFAULT uuidv7(), payload JSONB, status VARCHAR DEFAULT 'pending')").
+        """
+            CREATE TABLE IF NOT EXISTS cron_jobs (
+                id UUID PRIMARY KEY DEFAULT uuidv7(), 
+                cron VARCHAR,
+                is_active BOOLEAN DEFAULT true
+            )
+        """
+    ),
+    epgsql:squery(Conn,
+        """
+            CREATE TABLE IF NOT EXISTS jobs_queue (
+                id UUID PRIMARY KEY DEFAULT uuidv7(), 
+                payload JSONB,
+                cron_id UUID REFERENCES cron_jobs (id),
+                status VARCHAR DEFAULT 'pending'
+            )
+        """
+        ).
+

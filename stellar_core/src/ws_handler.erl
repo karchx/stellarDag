@@ -8,14 +8,17 @@ websocket_init(State) ->
     pg:join(ws_clients, self()),
     {ok, State}.
 
+websocket_handle({text, <<"ping">>}, State) ->
+    {reply, {text, <<"pong">>}, State};
 websocket_handle({text, Msg}, State) ->
     {reply, {text, <<"Echo: ", Msg/binary>>}, State};
 websocket_handle(_Data, State) ->
     {ok, State}.
 
 websocket_info({job_update, JobId, Status}, State) ->
-    Msg = io_lib:format("{\"job_id\": \"~p\", \"status\": \"~p\"}", [JobId, Status]),
-    {reply, {text, Msg}, State};
+    Data = #{<<"job_id">> => JobId, <<"status">> => Status},
+    {reply, {text, json:encode(Data)}, State};
+
 websocket_info(_Info, State) ->
     {ok, State}.
 

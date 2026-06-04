@@ -80,7 +80,7 @@ handle_event(internal, start_execution, starting, Data) ->
 handle_event(cast, {job_result, success}, active, Data) ->
     erlang:demonitor(Data#data.worker_mon, [flush]),
     notify_orchestrator(Data, success),
-    {stop, normal, Data};
+    {next_state, finished_success, Data, [{state_timeout, 0, stop_fsm}]};
 
 handle_event(cast, {job_result, error}, active, Data) ->
     erlang:demonitor(Data#data.worker_mon, [flush]),
@@ -89,7 +89,7 @@ handle_event(cast, {job_result, error}, active, Data) ->
         true ->
             error_logger:error_msg("[job_fsm] Job ~p max retries. Abort ~n", [Data#data.job_id]),
             notify_orchestrator(Data, abort),
-            {stop, {shutdown, abort}, Data};
+            {next_state, abort, Data, [{state_timeout, 0, stop_fsm}]};
         false ->
             Timeout = Data#data.base_backoff * (1 bsl Data#data.retries),
             error_logger:warning_msg("[job_fsm] Job ~p failed, Retry ~p/~p", [Data#data.job_id, NextRetry, Data#data.max_retries]),
@@ -103,6 +103,9 @@ handle_event(info, {'DOWN', Ref, process, WorkerPid, _Reason}, active, Data = #d
 %% retry_delay
 handle_event(state_timeout, backoff_expired, retry_delay, Data) ->
     {next_state, ready, Data, [{next_event, internal, request_worker}]};
+%% off FSM in terminate job
+handle_event(state_timeout, stop_fsm, State, Data) when State == finished_success; State == aborted ->
+    {stop, normal, Data};
 %% Cath-all
 handle_event(EventType, EventContent, State, _Data) ->
     error_logger:warning_msg("Unhandled event in ~p: ~p/~p~n", [State, EventType, EventContent]),

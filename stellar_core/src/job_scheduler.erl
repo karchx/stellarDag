@@ -1,7 +1,7 @@
 -module(job_scheduler).
 -behaviour(gen_server).
 
--export([start_link/0, add_cron_job/3]).
+-export([start_link/0, add_cron_job/3, normalize_payload/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 start_link() ->
@@ -28,6 +28,9 @@ handle_call(_Req, _From, State) ->
 handle_info({tick, JobId}, State) ->
     case maps:find(JobId, State) of
         {ok, {Payload, IntervalMs}} ->
+            Query = "INSERT INTO jobs_queue(payload, status) VALUES ($1, 'pending')",
+            JsonPayload = normalize_payload(Payload),
+            db_worker:execute_query(Query, [json:encode(JsonPayload)]),
             {ok, _Pid} = job_fsm:start_link([
                 {job_id, JobId},
                 {payload, Payload},
@@ -44,4 +47,12 @@ handle_info(_Info, State) ->
 
 terminate(_Reason, _State) -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
+
+normalize_payload(Payload) ->
+    case Payload of
+        {CmdType, CmdString} when is_list(CmdString) ->
+            #{atom_to_binary(CmdType, utf8) => list_to_binary(CmdString)};
+        AlreadyMap when is_map(AlreadyMap) ->
+            AlreadyMap
+    end.
 

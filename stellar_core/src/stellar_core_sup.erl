@@ -18,15 +18,22 @@ init([]) ->
         intensity => 5,
         period => 10
     },
+    
+    DbPoolArgs = [
+        {name, {local, db_pool}},
+        {worker_module, db_worker},
+        {size, 10},
+        {max_overflow, 5}
+    ],
+    DbPoolSpec = poolboy:child_spec(db_pool, DbPoolArgs, []),
+
     ChildSpecs = [
         #{id => pg, 
           start => {pg, start_link, []}, 
           restart => permanent, 
           type => worker
         },
-        #{id => db_worker,
-          start => {db_worker, start_link, []},
-          type => worker},
+        DbPoolSpec,
         #{id => worker_pool_sup,
           start => {worker_pool_sup, start_link, []},
           type => supervisor},

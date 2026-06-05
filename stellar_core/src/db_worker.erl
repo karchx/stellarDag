@@ -1,8 +1,9 @@
 -module(db_worker).
 -behaviour(gen_server).
+-behaviour(poolboy_worker).
 
 -export([
-    start_link/0,
+    start_link/1,
     fetch_and_lock_job/0,
     mark_job_done/2,
     execute_query/2, 
@@ -17,10 +18,10 @@
 ]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+start_link(Args) ->
+    gen_server:start_link(?MODULE, Args, []).
 
-init([]) ->
+init(_Args) ->
     Config = #{
         host => "localhost",
         username => "postgres",
@@ -29,7 +30,7 @@ init([]) ->
         timeout => 4000
     },
     {ok, Conn} = epgsql:connect(Config),
-    setup_table(Conn),
+    %% setup_table(Conn),
     {ok, Conn}.
 
 %% ====== API =====
@@ -37,40 +38,53 @@ init([]) ->
 register_job(CronDefId, Payload) ->
     Query = "INSERT INTO jobs_queue(cron_definition_id, payload, status) VALUES ($1, $2, 'pending')",
     JsonPayload = normalize_payload(Payload),
-    gen_server:call(?MODULE, {execute_query, Query, [CronDefId, json:encode(JsonPayload)]}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {execute_query, Query, [CronDefId, json:encode(JsonPayload)]})
+    end).
 
 register_cron(JobName, Payload, Cron) ->
     Query = "INSERT INTO cron_definitions (name, payload_template, cron) VALUES ($1, $2, $3) RETURNING id",
     JsonPayload = normalize_payload(Payload),
-    gen_server:call(?MODULE, {insert_returning, Query, [JobName, json:encode(JsonPayload), Cron]}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {insert_returning, Query, [JobName, json:encode(JsonPayload), Cron]})
+    end).
 
 get_active_crons() ->
     Query = "SELECT id, name, payload_template, cron FROM cron_definitions WHERE is_active = true",
-    gen_server:call(?MODULE, {fetch_rows, Query, []}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {fetch_rows, Query, []})
+    end).
 
 recover_stale_jobs() ->
     Query = "UPDATE jobs_queue SET status = 'pending' WHERE status = 'processing'",
-    gen_server:call(?MODULE, {execute_query, Query, []}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {execute_query, Query, []})
+    end).
 
--spec fetch_and_lock_job() -> {ok, pid()} | {error, pool_exhausted}.
 fetch_and_lock_job() ->
-    gen_server:call(?MODULE, fetch_and_lock_job).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, fetch_and_lock_job)
+    end).
 
--spec mark_job_done(pid(), term()) -> {ok, pid()} | {error, pool_exhausted}.
 mark_job_done(JobId, Result) ->
-    gen_server:call(?MODULE, {mark_job_done, JobId, Result}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {mark_job_done, JobId, Result})
+    end).
 
--spec execute_query(string(), term()) -> {ok, pid()} | {error, pool_exhausted}.
 execute_query(Query, Params) ->
-    gen_server:call(?MODULE, {execute_query, Query, Params}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {execute_query, Query, Params})
+    end).
 
--spec insert_returning(string(), term()) -> {ok, pid()} | {error, pool_exhausted}.
 insert_returning(Query, Params) ->
-    gen_server:call(?MODULE, {insert_returning, Query, Params}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {insert_returning, Query, Params})
+    end).
 
--spec fetch_rows(string(), term()) -> {ok, pid()} | {error, pool_exhausted}.
 fetch_rows(Query, Params) ->
-    gen_server:call(?MODULE, {fetch_rows, Query, Params}).
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {fetch_rows, Query, Params})
+    end).
 
 handle_call({execute_query, Query, Params}, _From, Conn) ->
     {ok, _} = epgsql:equery(Conn, Query, Params),

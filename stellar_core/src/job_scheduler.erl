@@ -1,41 +1,45 @@
 -module(job_scheduler).
 -behaviour(gen_server).
 
--export([start_link/0, add_cron_job/3, normalize_payload/1]).
+-export([start_link/0, add_cron_job/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-add_cron_job(JobId, Payload, IntervalMs) ->
-    gen_server:cast(?MODULE, {schedule, JobId, Payload, IntervalMs}).
+add_cron_job(JobName, Payload, IntervalMs) ->
+    gen_server:cast(?MODULE, {schedule, JobName, Payload, IntervalMs}).
 
 init([]) ->
-    {ok, #{}}.
+    ok = db_worker:recover_stale_jobs(),
 
-handle_cast({schedule, JobId, Payload, IntervalMs}, State) ->
-    error_logger:info_msg("[job_scheduler]: Created cron ~p for ~p ms~n", [JobId, IntervalMs]),
-    erlang:send_after(IntervalMs, self(), {tick, JobId}),
-    {noreply, maps:put(JobId, {Payload, IntervalMs}, State)};
+    case db_worker:get_active_crons() of
+        {ok, Rows} ->
+            State = lists:foldl(fun({CronId, JobName, Payload, Cron}, Acc) ->
+                %% Parse cron to int temp
+                %% add support for cron expressions
+                CronNumber = binary_to_integer(Cron),
+                erlang:send_after(CronNumber, self(), {tick, JobName}),
+                maps:put(JobName, {CronId, json:decode(Payload), CronNumber}, Acc)
+            end, #{}, Rows),
+            {ok, State};
+        {error, Reason} ->
+            {stop, {db_hydration_failed, Reason}}
+    end.
 
-handle_cast({job_done, JobId, Result}, State) ->
-    error_logger:info_msg("[job_scheduler] Job ~p finished with result ~p~n", [JobId, Result]),
-    {noreply, State}.
+handle_cast({schedule, JobName, Payload, IntervalMs}, State) ->
+    {ok, CronDefId} = db_worker:register_cron(JobName, Payload, IntervalMs),
+    error_logger:info_msg("[job_scheduler]: New cron Definition ~p (~p) for ~p ms~n", [JobName, CronDefId, IntervalMs]),
+    erlang:send_after(IntervalMs, self(), {tick, JobName}),
+    {noreply, maps:put(JobName, {CronDefId, Payload, IntervalMs}, State)}.
 
 handle_call(_Req, _From, State) ->
     {reply, {error, unknown_call}, State}.
 
 handle_info({tick, JobId}, State) ->
     case maps:find(JobId, State) of
-        {ok, {Payload, IntervalMs}} ->
-            Query = "INSERT INTO jobs_queue(payload, status) VALUES ($1, 'pending')",
-            JsonPayload = normalize_payload(Payload),
-            db_worker:execute_query(Query, [json:encode(JsonPayload)]),
-            {ok, _Pid} = job_fsm:start_link([
-                {job_id, JobId},
-                {payload, Payload},
-                {orchestrator_pid, self()}
-            ]),
+        {ok, {CronDefId, Payload, IntervalMs}} ->
+            ok = db_worker:register_job(CronDefId, Payload),
             erlang:send_after(IntervalMs, self(), {tick, JobId}),
             {noreply, State};
         error ->
@@ -47,12 +51,4 @@ handle_info(_Info, State) ->
 
 terminate(_Reason, _State) -> ok.
 code_change(_OldVsn, State, _Extra) -> {ok, State}.
-
-normalize_payload(Payload) ->
-    case Payload of
-        {CmdType, CmdString} when is_list(CmdString) ->
-            #{atom_to_binary(CmdType, utf8) => list_to_binary(CmdString)};
-        AlreadyMap when is_map(AlreadyMap) ->
-            AlreadyMap
-    end.
 

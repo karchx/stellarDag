@@ -1,9 +1,7 @@
 -module(stellar_core_sup).
-
 -behaviour(supervisor).
 
 -export([start_link/0]).
-
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
@@ -35,8 +33,14 @@ init([]) ->
         #{id => worker_pool,
           start => {worker_pool, start_link, [[{max_workers, 3}]]},
           type => worker},
+        #{id => job_fsm_sup,
+          start => {job_fsm_sup, start_link, []},
+          type => worker},
         #{id => job_scheduler,
           start => {job_scheduler, start_link, []},
+          type => worker},
+        #{id => job_consumer,
+          start => {job_consumer, start_link, []},
           type => worker}
     ],
     {ok, {SupFlags, ChildSpecs}}.

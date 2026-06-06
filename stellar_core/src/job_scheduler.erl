@@ -1,14 +1,20 @@
 -module(job_scheduler).
 -behaviour(gen_server).
 
--export([start_link/0, add_cron_job/3]).
+-export([start_link/0, add_cron_job/3, execute_now/1, execute_once/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-add_cron_job(JobName, Payload, IntervalMs) ->
-    gen_server:cast(?MODULE, {schedule, JobName, Payload, IntervalMs}).
+add_cron_job(JobName, Payload, CronExpr) ->
+    gen_server:cast(?MODULE, {schedule, JobName, Payload, CronExpr}).
+
+execute_now(JobName) ->
+    gen_server:cast(?MODULE, {execute_now, JobName}).
+
+execute_once(JobName) ->
+    gen_server:cast(?MODULE, {execute_once, JobName}).
 
 init([]) ->
     ok = db_worker:recover_stale_jobs(),
@@ -27,20 +33,30 @@ init([]) ->
             {stop, {db_hydration_failed, Reason}}
     end.
 
-handle_cast({schedule, JobName, Payload, IntervalMs}, State) ->
-    {ok, CronDefId} = db_worker:register_cron(JobName, Payload, IntervalMs),
-    error_logger:info_msg("[job_scheduler]: New cron Definition ~p (~p) for ~p ms~n", [JobName, CronDefId, IntervalMs]),
-    erlang:send_after(IntervalMs, self(), {tick, JobName}),
-    {noreply, maps:put(JobName, {CronDefId, Payload, IntervalMs}, State)}.
+handle_cast({execute_now, JobName}, State) ->
+    case maps:find(JobName, State) of
+        {ok, {CronDefId, Payload, _CronExpr}} ->
+            ok = db_worker:register_job(CronDefId, Payload),
+            {noreply, State};
+        error ->
+            error_logger:warning_msg("[job_scheduler]: Job ~p not found for execute_now~n", [JobName]),
+            {noreply, State}
+    end;
+
+handle_cast({schedule, JobName, Payload, CronExpr}, State) ->
+    {ok, CronDefId} = db_worker:register_cron(JobName, Payload, CronExpr),
+    error_logger:info_msg("[job_scheduler]: New cron Definition ~p (~p) for ~p ms~n", [JobName, CronDefId, CronExpr]),
+    erlang:send_after(CronExpr, self(), {tick, JobName}),
+    {noreply, maps:put(JobName, {CronDefId, Payload, CronExpr}, State)}.
 
 handle_call(_Req, _From, State) ->
     {reply, {error, unknown_call}, State}.
 
 handle_info({tick, JobId}, State) ->
     case maps:find(JobId, State) of
-        {ok, {CronDefId, Payload, IntervalMs}} ->
+        {ok, {CronDefId, Payload, CronExpr}} ->
             ok = db_worker:register_job(CronDefId, Payload),
-            erlang:send_after(IntervalMs, self(), {tick, JobId}),
+            erlang:send_after(CronExpr, self(), {tick, JobId}),
             {noreply, State};
         error ->
             {noreply, State}

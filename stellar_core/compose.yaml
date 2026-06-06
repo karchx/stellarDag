@@ -1,3 +1,6 @@
+volumes:
+  db_local:
+
 services:
   postgres:
     image: postgres:latest
@@ -8,3 +11,5 @@ services:
       POSTGRES_DB: stellar_core
     ports:
       - "5432:5432"
+    volumes:
+      - db_local:/var/lib/postgresql

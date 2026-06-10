@@ -1,2 +1,14 @@
-<h1 class="text-3xl font-bold text-indigo-600 mb-2 text-center">Не доверяй никому</h1>
+<div class="flex items-center justify-center  backdrop-blur-sm">
+  <div class="border border-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6">
+    <h2 class="text-xl font-semibold text-white text-center mb-1">Nuevo Job de Kubernetes</h2>
+
+    <form phx-submit="save_job" class="space-y-4">
+      <.input label="Job name" name="jobName" value={@form_data["jobName"]} />
+      <.input label="Type" name="typeJob" value={@form_data["typeJob"]} />
+      <.input label="Content" name="Content" value={@form_data["content"]} />
+      <.input label="Cron" name="Content" value={@form_data["Cron"]} />
+    </form>
+  </div>
+</div>
+
 

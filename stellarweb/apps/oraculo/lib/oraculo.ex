@@ -80,6 +80,7 @@ defmodule Oraculo do
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
+      import Oraculo.FormComponents
       # import Oraculo.CoreComponents
 
       # Common modules used in templates

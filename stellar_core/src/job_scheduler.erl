@@ -8,7 +8,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 add_cron_job(JobName, Payload, CronExpr) ->
-    gen_server:cast(?MODULE, {schedule, JobName, Payload, CronExpr}).
+    gen_server:call(?MODULE, {schedule, JobName, Payload, CronExpr}).
 
 execute_now(JobName) ->
     gen_server:cast(?MODULE, {execute_now, JobName}).
@@ -41,13 +41,14 @@ handle_cast({execute_now, JobName}, State) ->
         error ->
             error_logger:warning_msg("[job_scheduler]: Job ~p not found for execute_now~n", [JobName]),
             {noreply, State}
-    end;
+    end.
 
-handle_cast({schedule, JobName, Payload, CronExpr}, State) ->
+handle_call({schedule, JobName, Payload, CronExpr}, _From, State) ->
     {ok, CronDefId} = db_worker:register_cron(JobName, Payload, CronExpr),
     error_logger:info_msg("[job_scheduler]: New cron Definition ~p (~p) for ~p ms~n", [JobName, CronDefId, CronExpr]),
     erlang:send_after(CronExpr, self(), {tick, JobName}),
-    {noreply, maps:put(JobName, {CronDefId, Payload, CronExpr}, State)}.
+
+    {reply, {ok, CronDefId}, maps:put(JobName, {CronDefId, Payload, CronExpr}, State)};
 
 handle_call(_Req, _From, State) ->
     {reply, {error, unknown_call}, State}.

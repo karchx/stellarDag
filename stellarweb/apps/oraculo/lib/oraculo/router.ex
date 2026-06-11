@@ -1,0 +1,27 @@
+defmodule Oraculo.Router do
+  use Oraculo, :router
+
+  pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {Oraculo.Layouts, :root}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
+  pipeline :api do
+    plug :accepts, ["json"]
+  end
+
+  scope "/", Oraculo do
+    pipe_through :browser
+    
+    live "/", Workflow
+  end
+
+  # Other scopes may use custom stacks.
+  # scope "/api", Oraculo do
+  #   pipe_through :api
+  # end
+end

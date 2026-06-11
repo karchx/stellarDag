@@ -16,8 +16,8 @@ defmodule Oraculo.Router do
 
   scope "/", Oraculo do
     pipe_through :browser
-
-    get "/", PageController, :home
+    
+    live "/", Workflow
   end
 
   # Other scopes may use custom stacks.

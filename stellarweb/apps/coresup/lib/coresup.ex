@@ -1,18 +1,22 @@
 defmodule Coresup do
-  @moduledoc """
-  Documentation for `Coresup`.
-  """
+  require Logger
 
-  @doc """
-  Hello world.
+  @erlang_node :"stellar@stivarch"
 
-  ## Examples
+  def schedule_job(job_name, command_type \\ :bash, content, cron_expr) do
+    true = Node.connect(@erlang_node)
 
-      iex> Coresup.hello()
-      :world
+    erlang_payload = {command_type, to_charlist(content)}
 
-  """
-  def hello do
-    :world
+    GenServer.call(
+      {:job_scheduler, @erlang_node},
+      {:schedule, job_name, erlang_payload, cron_expr}
+    )
+  end
+
+  def execute_now(job_name) do
+    true = Node.connect(@erlang_node)
+    GenServer.cast({:job_scheduler, @erlang_node}, {:execute_now, job_name})
   end
 end
+

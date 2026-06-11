@@ -1,0 +1,18 @@
+<div class="flex items-center justify-center backdrop-blur-sm">
+  <div class="border border-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6">
+    <h2 class="text-xl font-semibold text-white text-center mb-1">Nuevo Job de Kubernetes</h2>
+
+    <.form for={@form} phx-submit="save_job" phx-target={@myself} class="space-y-4">
+      <.input label="Job name" field={@form[:job_name]} />
+      <.input label="Type" field={@form[:type_job]} />
+      <.input label="Content" field={@form[:content]} />
+      <.input label="Cron" field={@form[:cron]} placeholder="* * * * *" />
+
+      <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-800">
+        <button type="submit" class="cursor-pointer px-4 py-2 text-sm bg-white text-black font-medium hover:bg-gray-200 rounded transition-colors">Create Job</button>
+      </div>
+    </.form>
+  </div>
+</div>
+
+

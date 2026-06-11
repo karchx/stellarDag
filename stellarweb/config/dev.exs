@@ -57,3 +57,4 @@ config :oraculo, Oraculo.Endpoint,
 
 # Enable dev routes for dashboard and mailbox
 config :oraculo, dev_routes: true
+config :logger, level: :debug

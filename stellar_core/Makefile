@@ -15,4 +15,7 @@ test:
 	erlc -DTEST src/job_fsm.erl
 	erl -noshell -eval "eunit:test(job_fsm, [verbose])" -s init stop
 
+node:
+	rebar3 shell --sname stellar --setcookie oraculo_cookie
+
 .PHONY: all, deps, compile

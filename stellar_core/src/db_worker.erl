@@ -156,7 +156,7 @@ setup_table(Conn) ->
 normalize_payload(Payload) ->
     case Payload of
         {CmdType, CmdString} when is_list(CmdString) ->
-            #{atom_to_binary(CmdType, utf8) => list_to_binary(CmdString)};
+            #{CmdType => list_to_binary(CmdString)};
         AlreadyMap when is_map(AlreadyMap) ->
             AlreadyMap
     end.

@@ -1,8 +1,40 @@
 # stellar-operator
-// TODO(user): Add simple overview of use/purpose
+stellar operator SRE reconcile BEAM VM erlang and elixir app
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+```
++-----------------------------------------------------------------------------------+
+|                            KUBERNETES NAMESPACE                                   |
+|                                                                                   |
+|   +---------------------------------------------------------------------------+   |
+|   |                       stellar-headless (Service)                          |   |
+|   |  Dominio: stellar-headless.default.svc.cluster.local                      |   |
+|   |  (Retorna IPs individuales de los Pods del StatefulSet)                   |   |
+|   +-------------------+-----------------------------------+-------------------+   |
+|                       | (DNS Query)                       | (DNS Query)           |
+|                       v                                   v                       |
+|   +-----------------------------------+   +-----------------------------------+   |
+|   | POD: stellar-0                    |   | POD: stellar-1                    |   |
+|   | IP: 10.42.1.5                     |   | IP: 10.42.2.8                     |   |
+|   |                                   |   |                                   |   |
+|   |  +-----------------------------+  |   |  +-----------------------------+  |   |
+|   |  | BEAM VM (Elixir Frontend)   |  |   |  | BEAM VM (Erlang Core)       |  |   |
+|   |  | Nodo: oraculo@10.42.1.5     |  |   |  | Nodo: oraculo@10.42.2.8     |  |   |
+|   |  | Cookie: oraculo_cookie      |  |   |  | Cookie: oraculo_cookie      |  |   |
+|   |  +-----------------------------+  |   |  +-----------------------------+  |   |
+|   |           |             |         |   |         |             |           |   |
+|   |     :4369 (EPMD)  :9000 (Dist)    |   |   :4369 (EPMD)  :9000 (Dist)      |   |
+|   +-----------|-------------|---------+   +---------|-------------|-----------+   |
+|               |             |                       |             |               |
+|               |             +-----( Conexión TCP )--+             |               |
+|               |                     (Puerto 4369)                 |               |
+|               |                                                   |               |
+|               +-------------------( Conexión TCP )----------------+               |
+|                                    (Puerto 9000)                                  |
+|                                                                                   |
+|                       * Malla Completa (Full Mesh) Establecida * |
++-----------------------------------------------------------------------------------+
+```
 
 ## Getting Started
 
@@ -99,37 +131,4 @@ kubectl apply -f https://raw.githubusercontent.com/<org>/stellar-operator/<tag o
 ```sh
 kubebuilder edit --plugins=helm/v2-alpha
 ```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2026.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
 

@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- beam_v1alpha1_beamcluster.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

@@ -3,7 +3,7 @@ defmodule Oraculo.NewJob do
   use Oraculo, :live_component
   alias Ecto.Changeset
 
-  @types %{job_name: :string, type_job: :string, content: :string, cron: :integer}
+  @types %{job_name: :string, type_job: :string, content: :string, cron: :string}
 
   def update(_assigns, socket) do
     # Init empty form

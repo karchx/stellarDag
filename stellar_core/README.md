@@ -35,3 +35,40 @@ flowchart TD
     W_Wait --> W_Eval
     W_Wait -- "DAG with no pending nodes" --> W_End[End Workflow]
 ```
+
+## Cron core
+This FSM uses bitwise operations to compute ms.
+
+```
+stateDiagram-v2
+    state "Evaluate Month (Mo)" as EvalMo
+    state "Evaluate Day (D)" as EvalD
+    state "Evaluate Hour (H)" as EvalH
+    state "Evaluate Minute (M)" as EvalM
+    state "Fixed Point (Convergence)" as FixedPoint
+
+    [*] --> EvalMo
+
+    %% Month Transitions
+    EvalMo --> EvalMo : Mo > 12 \n [Y+1, Mo=1, D=1, H=0, M=0]
+    EvalMo --> EvalMo : Invalid Mo \n [Mo+1, D=1, H=0, M=0]
+    EvalMo --> EvalD : Valid Mo
+
+    %% Day Transitions
+    EvalD --> EvalMo : D > MaxDays \n [Mo+1, D=1, H=0, M=0]
+    EvalD --> EvalMo : Invalid D \n [D+1, H=0, M=0]
+    EvalD --> EvalH : Valid D
+
+    %% Hour Transitions
+    EvalH --> EvalMo : H > 23 \n [D+1, H=0, M=0]
+    EvalH --> EvalMo : Invalid H \n [H+1, M=0]
+    EvalH --> EvalM : Valid H
+
+    %% Minute Transitions
+    EvalM --> EvalMo : M > 59 \n [H+1, M=0]
+    EvalM --> EvalMo : Invalid M \n [M+1]
+    EvalM --> FixedPoint : Valid M
+
+    FixedPoint --> [*] : Returns {Y, Mo, D, H, M}
+```
+

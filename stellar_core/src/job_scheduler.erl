@@ -21,12 +21,11 @@ init([]) ->
 
     case db_worker:get_active_crons() of
         {ok, Rows} ->
-            State = lists:foldl(fun({CronId, JobName, Payload, Cron}, Acc) ->
-                %% Parse cron to int temp
-                %% add support for cron expressions
-                CronNumber = binary_to_integer(Cron),
-                erlang:send_after(CronNumber, self(), {tick, JobName}),
-                maps:put(JobName, {CronId, json:decode(Payload), CronNumber}, Acc)
+            State = lists:foldl(fun({CronId, JobName, Payload, CronExpr}, Acc) ->
+                %% Calculate next tick ms with cron expr
+                NextTickMs = cron_core:next_interval_ms(CronExpr),
+                erlang:send_after(NextTickMs, self(), {tick, JobName}),
+                maps:put(JobName, {CronId, json:decode(Payload), CronExpr}, Acc)
             end, #{}, Rows),
             {ok, State};
         {error, Reason} ->
@@ -41,12 +40,16 @@ handle_cast({execute_now, JobName}, State) ->
         error ->
             error_logger:warning_msg("[job_scheduler]: Job ~p not found for execute_now~n", [JobName]),
             {noreply, State}
-    end.
+    end;
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
 
 handle_call({schedule, JobName, Payload, CronExpr}, _From, State) ->
+    NextTickMs = cron_core:next_interval_ms(CronExpr),
     {ok, CronDefId} = db_worker:register_cron(JobName, Payload, CronExpr),
-    error_logger:info_msg("[job_scheduler]: New cron Definition ~p (~p) for ~p ms~n", [JobName, CronDefId, CronExpr]),
-    erlang:send_after(CronExpr, self(), {tick, JobName}),
+    error_logger:info_msg("[job_scheduler]: New cron Definition ~p (~p) for ~p", [JobName, CronDefId, CronExpr]),
+    erlang:send_after(NextTickMs, self(), {tick, JobName}),
 
     {reply, {ok, CronDefId}, maps:put(JobName, {CronDefId, Payload, CronExpr}, State)};
 
@@ -56,8 +59,9 @@ handle_call(_Req, _From, State) ->
 handle_info({tick, JobId}, State) ->
     case maps:find(JobId, State) of
         {ok, {CronDefId, Payload, CronExpr}} ->
+            NextTickMs = cron_core:next_interval_ms(CronExpr),
             ok = db_worker:register_job(CronDefId, Payload),
-            erlang:send_after(CronExpr, self(), {tick, JobId}),
+            erlang:send_after(NextTickMs, self(), {tick, JobId}),
             {noreply, State};
         error ->
             {noreply, State}

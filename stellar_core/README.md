@@ -39,7 +39,7 @@ flowchart TD
 ## Cron core
 This FSM uses bitwise operations to compute ms.
 
-```
+```mermaid
 stateDiagram-v2
     state "Evaluate Month (Mo)" as EvalMo
     state "Evaluate Day (D)" as EvalD

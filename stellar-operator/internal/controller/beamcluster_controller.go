@@ -110,6 +110,17 @@ func (r *BeamClusterReconciler) statefulSetForCluster(c *beamv1alpha1.BeamCluste
 									FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
 								},
 							},
+							{
+								Name: "RELEASE_COOKIE",
+								ValueFrom: &corev1.EnvVarSource{
+									SecretKeyRef: &corev1.SecretKeySelector{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: c.Spec.CookieSecret,
+										},
+										Key: "cookie",
+									},
+								},
+							},
 						},
 						Ports: []corev1.ContainerPort{
 							{ContainerPort: 4369, Name: "epmd"},

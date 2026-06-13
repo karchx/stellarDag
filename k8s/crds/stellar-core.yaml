@@ -1,0 +1,9 @@
+apiVersion: beam.stellar.dev/v1alpha1
+kind: BeamCluster
+metadata:
+  name: stellar-core
+  namespace: stellardag
+spec:
+  replicas: 3
+  image: 192.168.0.9:32000/stellar/core:latest
+  cookieSecret: oraculo-cookie-secret

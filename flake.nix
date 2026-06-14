@@ -31,16 +31,28 @@
                 checkouts = stellar_core_deps;
             };
 
+            stellarweb_deps = erlangPackages.fetchMixDeps {
+                pname = "mix-deps-stellarweb";
+                version = "0.1.0";
+                src = ./stellarweb;
+                nativeBuildInputs = [ pkgs.git ];
+                hash = "sha256-4FwCFKz3/Ko5TInlgPJXp+lcCzAAGjsSFvAXBWXgs1Y=";
+            };
             stellarweb = erlangPackages.mixRelease {
                 pname = "stellarweb";
                 version = "0.1.0";
                 src = ./stellarweb;
-                mixNixDeps = erlangPackages.fetchMixDeps {
-                    pname = "mix-deps-stellarweb";
-                    version = "0.1.0";
-                    src = ./stellarweb;
-                    hash = "";
-                };
+                nativeBuildInputs = [ 
+                    pkgs.nodejs
+                    pkgs.esbuild
+                    pkgs.tailwindcss_4
+                ];
+                mixFodDeps = stellarweb_deps;
+                preBuild = ''
+                    export MIX_ENV=prod
+                    export ESBUILD_PATH=${pkgs.esbuild}/bin/esbuild
+                    export TAILWIND_PATH=${pkgs.tailwindcss_4}/bin/tailwindcss
+                '';
             };
 
             stellar_core-image = pkgs.dockerTools.buildLayeredImage {
@@ -67,6 +79,11 @@
             stellarweb-image = pkgs.dockerTools.buildLayeredImage {
                 name = "stellarweb";
                 tag = "latest";
+                contents = [
+                    pkgs.coreutils
+                    pkgs.bash
+                    stellarweb
+                ];
                 config = {
                     Cmd = [ "${stellarweb}/bin/stellarweb" "start" ];
                     ExposedPorts = { "4000/tcp" = {}; };

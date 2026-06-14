@@ -30,13 +30,15 @@ config :esbuild,
   oraculo: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+    path: System.get_env("ESBUILD_PATH"),
     cd: Path.expand("../apps/oraculo/assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
 
 # Configure tailwind (the version is required)
 config :tailwind,
-  version: "4.1.12",
+  version: "4.3.0",
+  path: System.get_env("TAILWIND_PATH"),
   oraculo: [
     args: ~w(
       --input=assets/css/app.css
@@ -45,13 +47,7 @@ config :tailwind,
     cd: Path.expand("../apps/oraculo", __DIR__)
   ]
 
-# Sample configuration:
-#
-#     config :logger, :console,
-#       level: :info,
-#       format: "$date $time [$level] $metadata$message\n",
-#       metadata: [:user_id]
-#
+
 import Config
 
 # Configure Elixir's Logger

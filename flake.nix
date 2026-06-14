@@ -57,7 +57,10 @@
                 config = {
                     Cmd = [ "${stellar_core}/bin/stellar_core" "foreground" ];
                     ExposedPorts = { "4369/tcp" = {}; };
-                    Env = [ "LANG=C.UTF-8" ];
+                    Env = [ 
+                        "LANG=C.UTF-8" 
+                        "RELX_REPLACE_OS_VARS=true"
+                    ];
                 };
             };
 

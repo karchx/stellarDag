@@ -1,0 +1,4 @@
+-sname stellar_core
+-setcookie ${RELEASE_COOKIE}
++K true
++A30

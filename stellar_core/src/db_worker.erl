@@ -10,9 +10,9 @@
     insert_returning/2,
     fetch_rows/2,
     setup_table/1,
-    register_job/2,
-    register_cron/3,
-    get_active_crons/0,
+    register_job_run/2,
+    register_schedule/3,
+    get_active_jobs/0,
     recover_stale_jobs/0,
     normalize_payload/1
 ]).
@@ -23,9 +23,9 @@ start_link(Args) ->
 
 init(_Args) ->
     Config = #{
-        host => "postgres-postgresql.platform.svc.cluster.local",
-        username => "platform",
-        password => "changeme123",
+        host => "localhost",
+        username => "postgres",
+        password => "postgres",
         database => "stellar_core",
         timeout => 4000
     },
@@ -35,28 +35,28 @@ init(_Args) ->
 
 %% ====== API =====
 
-register_job(CronDefId, Payload) ->
-    Query = "INSERT INTO jobs_queue(cron_definition_id, payload, status) VALUES ($1, $2, 'pending')",
+register_job_run(ScheduleId, Payload) ->
+    Query = "INSERT INTO job_runs(schedule_id, payload, status) VALUES ($1, $2, 'pending')",
     JsonPayload = normalize_payload(Payload),
     poolboy:transaction(db_pool, fun(Worker) ->
-        gen_server:call(Worker, {execute_query, Query, [CronDefId, json:encode(JsonPayload)]})
+        gen_server:call(Worker, {execute_query, Query, [ScheduleId, json:encode(JsonPayload)]})
     end).
 
-register_cron(JobName, Payload, Cron) ->
-    Query = "INSERT INTO cron_definitions (name, payload_template, cron) VALUES ($1, $2, $3) RETURNING id",
+register_schedule(JobName, Payload, Cron) ->
+    Query = "INSERT INTO job_schedules (name, payload_template, cron_expr) VALUES ($1, $2, $3) RETURNING id",
     JsonPayload = normalize_payload(Payload),
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:call(Worker, {insert_returning, Query, [JobName, json:encode(JsonPayload), Cron]})
     end).
 
-get_active_crons() ->
-    Query = "SELECT id, name, payload_template, cron FROM cron_definitions WHERE is_active = true",
+get_active_jobs() ->
+    Query = "SELECT id, name, payload_template, cron_expr FROM job_schedules WHERE is_active = true",
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:call(Worker, {fetch_rows, Query, []})
     end).
 
 recover_stale_jobs() ->
-    Query = "UPDATE jobs_queue SET status = 'pending' WHERE status = 'processing'",
+    Query = "UPDATE job_runs SET status = 'pending' WHERE status = 'processing'",
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:call(Worker, {execute_query, Query, []})
     end).
@@ -104,11 +104,12 @@ handle_call({fetch_rows, Query, Params}, _From, Conn) ->
 
 handle_call(fetch_and_lock_job, _From, Conn) ->
     Query = """
-        UPDATE jobs_queue 
+        UPDATE job_runs 
         SET status = 'processing' 
         WHERE id = (
-            SELECT id FROM jobs_queue
+            SELECT id FROM job_runs
             WHERE status = 'pending'
+            ORDER BY id ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
         )
@@ -123,7 +124,7 @@ handle_call(fetch_and_lock_job, _From, Conn) ->
 
 handle_call({mark_job_done, JobId, Result}, _From, Conn) ->
     Status = case Result of success -> "completed"; error -> "failed" end,
-    Query = "UPDATE jobs_queue SET status = $1 WHERE id = $2",
+    Query = "UPDATE job_runs SET status = $1 WHERE id = $2",
     {ok, _} = epgsql:equery(Conn, Query, [Status, JobId]),
     {reply, ok, Conn}.
 
@@ -133,10 +134,10 @@ handle_info(_Info, Conn) -> {noreply, Conn}.
 setup_table(Conn) ->
    epgsql:squery(Conn,
         """
-            CREATE TABLE IF NOT EXISTS cron_definitions (
+            CREATE TABLE IF NOT EXISTS job_schedules (
                 id UUID PRIMARY KEY DEFAULT uuidv7(),
                 name VARCHAR UNIQUE NOT NULL,
-                cron VARCHAR,
+                cron_expr VARCHAR,
                 payload_template JSONB NOT NULL,
                 is_active BOOLEAN DEFAULT true
             )
@@ -144,12 +145,12 @@ setup_table(Conn) ->
     ),
     epgsql:squery(Conn,
         """
-            CREATE TABLE IF NOT EXISTS jobs_queue (
+            CREATE TABLE IF NOT EXISTS job_runs (
                 id UUID PRIMARY KEY DEFAULT uuidv7(),
-                cron_definition_id UUID REFERENCES cron_definitions (id) ON DELETE SET NULL,
+                schedule_id UUID REFERENCES job_schedules (id) ON DELETE SET NULL,
                 payload JSONB,
                 status VARCHAR DEFAULT 'pending'
-            )
+            );
         """
     ).
 

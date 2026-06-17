@@ -11,8 +11,10 @@
     fetch_rows/2,
     setup_table/1,
     register_job_run/2,
+    register_job_run/3,
     register_schedule/3,
     get_active_jobs/0,
+    active_job_by_id/1,
     recover_stale_jobs/0,
     normalize_payload/1
 ]).
@@ -34,12 +36,14 @@ init(_Args) ->
     {ok, Conn}.
 
 %% ====== API =====
-
 register_job_run(ScheduleId, Payload) ->
-    Query = "INSERT INTO job_runs(schedule_id, payload, status) VALUES ($1, $2, 'pending')",
+    register_job_run(ScheduleId, Payload, <<"pending">>).
+
+register_job_run(ScheduleId, Payload, Status) ->
+    Query = "INSERT INTO job_runs(schedule_id, payload, status) VALUES ($1, $2, $3)",
     JsonPayload = normalize_payload(Payload),
     poolboy:transaction(db_pool, fun(Worker) ->
-        gen_server:call(Worker, {execute_query, Query, [ScheduleId, json:encode(JsonPayload)]})
+        gen_server:call(Worker, {execute_query, Query, [ScheduleId, json:encode(JsonPayload), Status]})
     end).
 
 register_schedule(JobName, Payload, Cron) ->
@@ -69,6 +73,11 @@ fetch_and_lock_job() ->
 mark_job_done(JobId, Result) ->
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:call(Worker, {mark_job_done, JobId, Result})
+    end).
+
+active_job_by_id(JobId) ->
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {active_job_by_id, JobId})
     end).
 
 execute_query(Query, Params) ->
@@ -108,7 +117,7 @@ handle_call(fetch_and_lock_job, _From, Conn) ->
         SET status = 'processing' 
         WHERE id = (
             SELECT id FROM job_runs
-            WHERE status = 'pending'
+            WHERE status in ('pending', 'queue')
             ORDER BY id ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
@@ -118,6 +127,20 @@ handle_call(fetch_and_lock_job, _From, Conn) ->
 
     case epgsql:squery(Conn, Query) of
         {ok, 1, _Cols, [{Id, Payload}]} -> {reply, {ok, Id, Payload}, Conn};
+        {ok, 0, _Cols, []} -> {reply, empty, Conn};
+        Error -> {reply, {error, Error}, Conn}
+    end;
+
+handle_call({active_job_by_id, JobId}, _From, Conn) ->
+    Query = """
+        UPDATE job_schedules
+        SET is_active = true
+        WHERE id = $1
+        RETURNING id, name, payload_template, cron_expr
+    """,
+
+    case epgsql:equery(Conn, Query, [JobId]) of
+        {ok, 1, _Cols, [{Id, Name, Payload, CronExpr}]} -> {reply, {ok, Id, Name, Payload, CronExpr}, Conn};
         {ok, 0, _Cols, []} -> {reply, empty, Conn};
         Error -> {reply, {error, Error}, Conn}
     end;
@@ -139,7 +162,7 @@ setup_table(Conn) ->
                 name VARCHAR UNIQUE NOT NULL,
                 cron_expr VARCHAR,
                 payload_template JSONB NOT NULL,
-                is_active BOOLEAN DEFAULT true
+                is_active BOOLEAN DEFAULT false
             )
         """
     ),
@@ -151,6 +174,16 @@ setup_table(Conn) ->
                 payload JSONB,
                 status VARCHAR DEFAULT 'pending'
             );
+        """
+    ),
+    epgsql:squery(Conn,
+        """
+            CREATE TABLE IF NOT EXISTS job_dependencies (
+                parent_job_id UUID REFERENCES job_runs(id) ON DELETE CASCADE,
+                child_job_id UUID REFERENCES job_runs(id) ON DELETE CASCADE,
+                PRIMARY KEY (parent_job_id, child_job_id)
+            );
+            CREATE INDEX idx_child_job ON job_dependencies(child_job_id);
         """
     ).
 

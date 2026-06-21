@@ -1,7 +1,7 @@
 -module(job_scheduler).
 -behaviour(gen_server).
 
--export([start_link/0, add_schedule_job/3, execute_now/1, execute_once/1, active_job/1]).
+-export([start_link/0, add_schedule_job/3, execute_now/1, execute_once/1, active_job/1, add_dependencies/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 start_link() ->
@@ -12,6 +12,9 @@ add_schedule_job(JobName, Payload, CronExpr) ->
 
 active_job(JobName) ->
     gen_server:cast(?MODULE, {active_job, JobName}).
+
+add_dependencies(JobChildId, JobParentId) ->
+    gen_server:cast(?MODULE, {add_dependencies, JobChildId, JobParentId}).
 
 execute_now(JobName) ->
     gen_server:cast(?MODULE, {execute_now, JobName}).
@@ -50,6 +53,7 @@ handle_cast({active_job, Id}, State) ->
         {ok, ScheduleId, JobName, Payload, CronExpr} ->
             NextTickMs = cron_core:next_interval_ms(CronExpr),
             erlang:send_after(NextTickMs, self(), {tick, JobName}),
+            ok = db_worker:in_queue_job(ScheduleId),
             {noreply, maps:put(JobName, {ScheduleId, json:decode(Payload), CronExpr}, State)};
         empty ->
             error_logger:warning_msg("[job_scheduler]: Job ~p not found for active job~n", [Id]),
@@ -58,6 +62,11 @@ handle_cast({active_job, Id}, State) ->
             error_logger:error_msg("[job_consumer] Failed on polling: ~p~n", [Reason]),
             {noreply, State}
     end;
+
+handle_cast({add_dependencies, JobChildId, JobParentId}, State) ->
+    ok = db_worker:register_dependencies(JobChildId, JobParentId),
+    db_worker:mark_job_dependency(JobChildId, 1),
+    {noreply, State};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

@@ -6,16 +6,18 @@
     start_link/1,
     fetch_and_lock_job/0,
     mark_job_done/2,
+    mark_job_dependency/2,
     execute_query/2, 
     insert_returning/2,
     fetch_rows/2,
-    setup_table/1,
     register_job_run/2,
     register_job_run/3,
     register_schedule/3,
+    register_dependencies/2,
     get_active_jobs/0,
     active_job_by_id/1,
     recover_stale_jobs/0,
+    in_queue_job/1,
     normalize_payload/1
 ]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
@@ -53,8 +55,27 @@ register_schedule(JobName, Payload, Cron) ->
         gen_server:call(Worker, {insert_returning, Query, [JobName, json:encode(JsonPayload), Cron]})
     end).
 
+register_dependencies(JobChildId, JobParentId) ->
+    Query = "INSERT INTO job_dependencies (child_job_id, parent_job_id) VALUES ($1, $2)",
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {execute_query, Query, [JobChildId, JobParentId]})
+    end). 
+
 get_active_jobs() ->
-    Query = "SELECT id, name, payload_template, cron_expr FROM job_schedules WHERE is_active = true",
+    Query = """
+        WITH j_runs AS (
+            SELECT schedule_id 
+            FROM job_runs AS jr
+            WHERE jr.status <> 'blocked'
+            ORDER BY id
+            LIMIT 1
+        )
+        SELECT 
+            id, name, payload_template, cron_expr 
+        FROM job_schedules AS js
+        INNER JOIN j_runs AS jr ON jr.schedule_id = js.id
+        WHERE js.is_active = true
+    """,
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:call(Worker, {fetch_rows, Query, []})
     end).
@@ -73,6 +94,16 @@ fetch_and_lock_job() ->
 mark_job_done(JobId, Result) ->
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:call(Worker, {mark_job_done, JobId, Result})
+    end).
+
+mark_job_dependency(JobId, N) ->
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:call(Worker, {mark_job_dependency, JobId, N})
+    end).
+
+in_queue_job(ScheduleId) ->
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:cast(Worker, {in_queue_job, ScheduleId})
     end).
 
 active_job_by_id(JobId) ->
@@ -117,7 +148,7 @@ handle_call(fetch_and_lock_job, _From, Conn) ->
         SET status = 'processing' 
         WHERE id = (
             SELECT id FROM job_runs
-            WHERE status in ('pending', 'queue')
+            WHERE status = 'queue'
             ORDER BY id ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
@@ -148,45 +179,80 @@ handle_call({active_job_by_id, JobId}, _From, Conn) ->
 handle_call({mark_job_done, JobId, Result}, _From, Conn) ->
     Status = case Result of success -> "completed"; error -> "failed" end,
     Query = "UPDATE job_runs SET status = $1 WHERE id = $2",
-    {ok, _} = epgsql:equery(Conn, Query, [Status, JobId]),
-    {reply, ok, Conn}.
+    case epgsql:equery(Conn, Query, [Status, JobId]) of
+        {ok, _} ->
+            {reply, ok, Conn};
+        {error, Reason} ->
+            {reply, {error, Reason}, Conn}
+    end;
+
+handle_call({mark_job_dependency, JobId, N}, _From, Conn) ->
+    Query = """
+        UPDATE job_runs 
+        SET status             = 'blocked',
+            unmet_dependencies = $1
+        WHERE id = $2
+        AND status = 'pending'
+    """,
+    case epgsql:equery(Conn, Query, [N, JobId]) of
+        {ok, _} ->
+            {reply, ok, Conn};
+        {error, Reason} ->
+            {reply, {error, Reason}, Conn}
+    end.
+
+handle_cast({in_queue_job, ScheduleId}, Conn) ->
+    Query = """
+        UPDATE job_runs
+            SET status = 'queue'
+        WHERE schedule_id = $1
+        AND status = 'pending'
+    """,
+    case epgsql:equery(Conn, Query, [ScheduleId]) of
+        {ok, _} ->
+            {noreply, Conn};
+        {error, _Reason} ->
+            {noreply, Conn}
+    end;
 
 handle_cast(_Msg, Conn) -> {noreply, Conn}.
+
 handle_info(_Info, Conn) -> {noreply, Conn}.
 
-setup_table(Conn) ->
-   epgsql:squery(Conn,
-        """
-            CREATE TABLE IF NOT EXISTS job_schedules (
-                id UUID PRIMARY KEY DEFAULT uuidv7(),
-                name VARCHAR UNIQUE NOT NULL,
-                cron_expr VARCHAR,
-                payload_template JSONB NOT NULL,
-                is_active BOOLEAN DEFAULT false
-            )
-        """
-    ),
-    epgsql:squery(Conn,
-        """
-            CREATE TABLE IF NOT EXISTS job_runs (
-                id UUID PRIMARY KEY DEFAULT uuidv7(),
-                schedule_id UUID REFERENCES job_schedules (id) ON DELETE SET NULL,
-                payload JSONB,
-                status VARCHAR DEFAULT 'pending'
-            );
-        """
-    ),
-    epgsql:squery(Conn,
-        """
-            CREATE TABLE IF NOT EXISTS job_dependencies (
-                parent_job_id UUID REFERENCES job_runs(id) ON DELETE CASCADE,
-                child_job_id UUID REFERENCES job_runs(id) ON DELETE CASCADE,
-                PRIMARY KEY (parent_job_id, child_job_id)
-            );
-            CREATE INDEX idx_child_job ON job_dependencies(child_job_id);
-        """
-    ).
-
+%% setup_table(Conn) ->
+%%    epgsql:squery(Conn,
+%%         """
+%%             CREATE TABLE IF NOT EXISTS job_schedules (
+%%                 id UUID PRIMARY KEY DEFAULT uuidv7(),
+%%                 name VARCHAR UNIQUE NOT NULL,
+%%                 cron_expr VARCHAR,
+%%                 payload_template JSONB NOT NULL,
+%%                 is_active BOOLEAN DEFAULT false
+%%             )
+%%         """
+%%     ),
+%%     epgsql:squery(Conn,
+%%         """
+%%             CREATE TABLE IF NOT EXISTS job_runs (
+%%                 id UUID PRIMARY KEY DEFAULT uuidv7(),
+%%                 schedule_id UUID REFERENCES job_schedules (id) ON DELETE SET NULL,
+%%                 payload JSONB,
+%%                 unmet_dependencies INT DEFAULT 0,
+%%                 status VARCHAR DEFAULT 'pending'
+%%             );
+%%         """
+%%     ),
+%%     epgsql:squery(Conn,
+%%         """
+%%          CREATE TABLE IF NOT EXISTS job_dependencies (
+%%            parent_schedule_id UUID REFERENCES job_schedules(id) ON DELETE CASCADE,
+%%            child_schedule_id UUID REFERENCES job_schedules(id) ON DELETE CASCADE,
+%%            PRIMARY KEY (parent_schedule_id, child_schedule_id)
+%%            );
+%%             CREATE INDEX idx_child_job ON job_dependencies(child_job_id);
+%%         """
+%%     ).
+%% 
 normalize_payload(Payload) ->
     case Payload of
         {CmdType, CmdString} when is_list(CmdString) ->

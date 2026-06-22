@@ -56,7 +56,7 @@ register_schedule(JobName, Payload, Cron) ->
     end).
 
 register_dependencies(JobChildId, JobParentId) ->
-    Query = "INSERT INTO job_dependencies (child_job_id, parent_job_id) VALUES ($1, $2)",
+    Query = "INSERT INTO job_dependencies (child_schedule_id, parent_schedule_id) VALUES ($1, $2)",
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:call(Worker, {execute_query, Query, [JobChildId, JobParentId]})
     end). 
@@ -191,7 +191,7 @@ handle_call({mark_job_dependency, JobId, N}, _From, Conn) ->
         UPDATE job_runs 
         SET status             = 'blocked',
             unmet_dependencies = $1
-        WHERE id = $2
+        WHERE schedule_id = $2
         AND status = 'pending'
     """,
     case epgsql:equery(Conn, Query, [N, JobId]) of

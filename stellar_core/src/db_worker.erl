@@ -18,6 +18,7 @@
     active_job_by_id/1,
     recover_stale_jobs/0,
     in_queue_job/1,
+    job_unlock_dependence/1,
     normalize_payload/1
 ]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
@@ -96,14 +97,19 @@ mark_job_done(JobId, Result) ->
         gen_server:call(Worker, {mark_job_done, JobId, Result})
     end).
 
-mark_job_dependency(JobId, N) ->
+mark_job_dependency(JobId, Parents) ->
     poolboy:transaction(db_pool, fun(Worker) ->
-        gen_server:call(Worker, {mark_job_dependency, JobId, N})
+        gen_server:call(Worker, {mark_job_dependency, JobId, Parents})
     end).
 
 in_queue_job(ScheduleId) ->
     poolboy:transaction(db_pool, fun(Worker) ->
         gen_server:cast(Worker, {in_queue_job, ScheduleId})
+    end).
+
+job_unlock_dependence(JobId) ->
+    poolboy:transaction(db_pool, fun(Worker) ->
+        gen_server:cast(Worker, {job_unlock_dependence, JobId})
     end).
 
 active_job_by_id(JobId) ->
@@ -153,11 +159,11 @@ handle_call(fetch_and_lock_job, _From, Conn) ->
             LIMIT 1
             FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, payload
+        RETURNING id, payload, schedule_id
     """,
 
     case epgsql:squery(Conn, Query) of
-        {ok, 1, _Cols, [{Id, Payload}]} -> {reply, {ok, Id, Payload}, Conn};
+        {ok, 1, _Cols, [{Id, Payload, ScheduleId}]} -> {reply, {ok, Id, Payload, ScheduleId}, Conn};
         {ok, 0, _Cols, []} -> {reply, empty, Conn};
         Error -> {reply, {error, Error}, Conn}
     end;
@@ -186,15 +192,15 @@ handle_call({mark_job_done, JobId, Result}, _From, Conn) ->
             {reply, {error, Reason}, Conn}
     end;
 
-handle_call({mark_job_dependency, JobId, N}, _From, Conn) ->
+handle_call({mark_job_dependency, ScheduleId, Parents}, _From, Conn) ->
     Query = """
         UPDATE job_runs 
         SET status             = 'blocked',
-            unmet_dependencies = $1
+            pending_parents = $1
         WHERE schedule_id = $2
         AND status = 'pending'
     """,
-    case epgsql:equery(Conn, Query, [N, JobId]) of
+    case epgsql:equery(Conn, Query, [Parents, ScheduleId]) of
         {ok, _} ->
             {reply, ok, Conn};
         {error, Reason} ->
@@ -209,6 +215,26 @@ handle_cast({in_queue_job, ScheduleId}, Conn) ->
         AND status = 'pending'
     """,
     case epgsql:equery(Conn, Query, [ScheduleId]) of
+        {ok, _} ->
+            {noreply, Conn};
+        {error, _Reason} ->
+            {noreply, Conn}
+    end;
+
+handle_cast({job_unlock_dependence, JobId}, Conn) ->
+    Query = """
+        WITH updated_children AS (
+            UPDATE job_runs
+            SET pending_parents = array_remove(pending_parents, $1)
+            WHERE status = 'blocked'
+            AND $1 = ANY(pending_parents)
+            RETURNING id, pending_parents
+        )
+        UPDATE job_runs
+        SET status = 'queue'
+        WHERE id IN (SELECT id FROM updated_children WHERE pending_parents = '{}')
+    """,
+    case epgsql:equery(Conn, Query, [JobId]) of
         {ok, _} ->
             {noreply, Conn};
         {error, _Reason} ->
@@ -237,9 +263,12 @@ handle_info(_Info, Conn) -> {noreply, Conn}.
 %%                 id UUID PRIMARY KEY DEFAULT uuidv7(),
 %%                 schedule_id UUID REFERENCES job_schedules (id) ON DELETE SET NULL,
 %%                 payload JSONB,
-%%                 unmet_dependencies INT DEFAULT 0,
+%%                 pending_parents UUID[] DEFAULT '{}',
 %%                 status VARCHAR DEFAULT 'pending'
 %%             );
+%%             CREATE INDEX idx_job_runs_pending_parents 
+%%             ON job_runs USING GIN (pending_parents) 
+%%             WHERE status = 'pending';
 %%         """
 %%     ),
 %%     epgsql:squery(Conn,

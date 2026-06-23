@@ -8,6 +8,7 @@
 
 -record(data, {
     job_id,
+    schedule_id,
     payload,
     orchestrator_pid,
     worker_pid = undefined,
@@ -38,6 +39,7 @@ get_state(JobId) ->
 init(Opts) ->
     Data = #data{
         job_id = proplists:get_value(job_id, Opts),
+        schedule_id = proplists:get_value(schedule_id, Opts),
         payload = proplists:get_value(payload, Opts),
         orchestrator_pid = proplists:get_value(orchestrator_pid, Opts),
         max_retries = proplists:get_value(max_retries, Opts, 3),
@@ -114,8 +116,8 @@ handle_event(EventType, EventContent, State, _Data) ->
 terminate(_Reason, _State, _Data) ->
     ok.
 
-notify_orchestrator(#data{orchestrator_pid = Pid, job_id = JobId}, Result) ->
-    gen_server:cast(Pid, {job_done, JobId, Result}).
+notify_orchestrator(#data{orchestrator_pid = Pid, job_id = JobId, schedule_id = ScheduleId}, Result) ->
+    gen_server:cast(Pid, {job_done, JobId, Result, ScheduleId}).
 
 %% ---- EUNIT Test ----
 -ifdef(TEST).

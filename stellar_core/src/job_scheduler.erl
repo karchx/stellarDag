@@ -64,8 +64,8 @@ handle_cast({active_job, Id}, State) ->
     end;
 
 handle_cast({add_dependencies, JobChildId, JobParentId}, State) ->
-    Res = [db_worker:register_dependencies(JobChildId, ParentId) || ParentId <- JobParentId],
-    db_worker:mark_job_dependency(JobChildId, length(Res)),
+    _ = [db_worker:register_dependencies(JobChildId, ParentId) || ParentId <- JobParentId],
+    db_worker:mark_job_dependency(JobChildId, JobParentId),
     {noreply, State};
 
 handle_cast(_Msg, State) ->

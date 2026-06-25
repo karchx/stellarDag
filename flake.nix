@@ -18,8 +18,7 @@
         owner = "tailwindlabs";
         repo = "heroicons";
         rev = "v2.2.0";
-        hash = "";
-        depth = 1;
+        hash = "sha256-A8JTVl0Yig++G2B8dyoq5gMpVRnU/wL4I74WK8sB6aU=";
         sparseCheckout = [
             "optimized"
         ];
@@ -62,6 +61,9 @@
                     export MIX_ENV=prod
                     export ESBUILD_PATH=${pkgs.esbuild}/bin/esbuild
                     export TAILWIND_PATH=${pkgs.tailwindcss_4}/bin/tailwindcss
+
+                    mkdir -p deps/heroicons
+                    cp -r ${heroicons-src}/optimized deps/heroicons/optimized
 
                     mix tailwind oraculo --minify --no-deps-check
                     mix esbuild oraculo --minify --no-deps-check

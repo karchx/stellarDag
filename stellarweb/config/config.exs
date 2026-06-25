@@ -26,7 +26,7 @@ config :oraculo, Oraculo.Endpoint,
 
 # Configure esbuild (the version is required)
 config :esbuild,
-  version: "0.25.4",
+  version: "0.27.2",
   path: System.get_env("ESBUILD_PATH"),
   oraculo: [
     args:

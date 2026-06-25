@@ -65,8 +65,10 @@
                     mkdir -p deps/heroicons
                     cp -r ${heroicons-src}/optimized deps/heroicons/optimized
 
+                    mix compile --no-deps-check
+
                     mix tailwind oraculo --minify --no-deps-check
-                    mix esbuild oraculo --minify --no-deps-check
+                    mix esbuild oraculo --minify
                     mix phx.digest --no-deps-check
                 '';
             };

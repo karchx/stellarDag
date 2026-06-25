@@ -36,7 +36,7 @@
                 version = "0.1.0";
                 src = ./stellarweb;
                 nativeBuildInputs = [ pkgs.git ];
-                hash = "sha256-4FwCFKz3/Ko5TInlgPJXp+lcCzAAGjsSFvAXBWXgs1Y=";
+                hash = "";
             };
             stellarweb = erlangPackages.mixRelease {
                 pname = "stellarweb";
@@ -52,6 +52,10 @@
                     export MIX_ENV=prod
                     export ESBUILD_PATH=${pkgs.esbuild}/bin/esbuild
                     export TAILWIND_PATH=${pkgs.tailwindcss_4}/bin/tailwindcss
+
+                    mix tailwind default --minify --no-deps-check
+                    mix esbuild default --minify --no-deps-check
+                    mix phx.digest --no-deps-check
                 '';
             };
 

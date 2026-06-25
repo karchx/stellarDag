@@ -221,14 +221,29 @@ handle_cast({in_queue_job, ScheduleId}, Conn) ->
             {noreply, Conn}
     end;
 
+WITH updated_children AS (
+    UPDATE job_runs AS jr
+    SET pending_parents = array_remove(pending_parents, '019eff48-b0b4-716f-8254-fee4cefadea9')
+    FROM job_schedules AS js
+    WHERE jr.schedule_id = js.id
+    AND jr.status = 'blocked'
+    AND js.is_active = true
+    AND '019eff48-b0b4-716f-8254-fee4cefadea9' = ANY(pending_parents)
+    RETURNING jr.id, pending_parents
+)
+select * from updated_children;
+
 handle_cast({job_unlock_dependence, JobId}, Conn) ->
     Query = """
         WITH updated_children AS (
-            UPDATE job_runs
+            UPDATE job_runs AS jr
             SET pending_parents = array_remove(pending_parents, $1)
-            WHERE status = 'blocked'
+            FROM job_schedules AS js
+            WHERE jr.schedule_id = js.id
+            AND jr.status = 'blocked'
+            AND js.is_active = true
             AND $1 = ANY(pending_parents)
-            RETURNING id, pending_parents
+            RETURNING jr.id, pending_parents
         )
         UPDATE job_runs
         SET status = 'queue'

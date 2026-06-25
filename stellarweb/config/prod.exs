@@ -7,6 +7,7 @@ import Config
 # before starting your production server.
 config :oraculo, Oraculo.Endpoint,
   url: [host: "localhost", port: 80],
+  check_origin: false,
   cache_static_manifest: "priv/static/cache_manifest.json"
 
 # Force using SSL in production. This also sets the "strict-security-transport" header,

@@ -32,12 +32,11 @@ defmodule Oraculo.MixProject do
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
-
   # Specifies your project dependencies.
   #
   # Type `mix help deps` for examples and options.
   defp deps do
-    [
+    base = [
       {:phoenix, "~> 1.8.7"},
       {:phoenix_ecto, "~> 4.5"},
       {:phoenix_html, "~> 4.1"},
@@ -48,19 +47,27 @@ defmodule Oraculo.MixProject do
       {:tailwind, "~> 0.3", only: [:dev, :prod]},
       # {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       # {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
-      {:heroicons,
-       github: "tailwindlabs/heroicons",
-       tag: "v2.2.0",
-       sparse: "optimized",
-       app: false,
-       compile: false,
-       depth: 1},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
       {:coresup, in_umbrella: true},
     ]
+
+    if Mix.env() == :dev do
+      base ++ [
+        {:heroicons,
+         github: "tailwindlabs/heroicons",
+         tag: "v2.2.0",
+         sparse: "optimized",
+         app: false,
+         compile: false,
+         depth: 1,
+         only: [:dev]}
+      ]
+    else
+      base
+    end
   end
 
   # Aliases are shortcuts or tasks specific to the current project.

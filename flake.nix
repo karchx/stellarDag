@@ -14,6 +14,16 @@
       rebar3 = pkgs.rebar3;
 
       registry = "192.168.0.9:32000";
+      heroicons-src = pkgs.fetchFromGitHub {
+        owner = "tailwindlabs";
+        repo = "heroicons";
+        rev = "v2.2.0";
+        hash = "";
+        depth = 1;
+        sparseCheckout = [
+            "optimized"
+        ];
+      };
     in {
         packages = rec {
             stellar_core_deps = erlangPackages.fetchRebar3Deps {
@@ -36,7 +46,7 @@
                 version = "0.1.0";
                 src = ./stellarweb;
                 nativeBuildInputs = [ pkgs.git ];
-                hash = "";
+                hash = "sha256-RCTpNDxts5qmWeF/yrqk5QIyCjrdoGamamRePXWoC8g=";
             };
             stellarweb = erlangPackages.mixRelease {
                 pname = "stellarweb";
@@ -53,8 +63,8 @@
                     export ESBUILD_PATH=${pkgs.esbuild}/bin/esbuild
                     export TAILWIND_PATH=${pkgs.tailwindcss_4}/bin/tailwindcss
 
-                    mix tailwind default --minify --no-deps-check
-                    mix esbuild default --minify --no-deps-check
+                    mix tailwind oraculo --minify --no-deps-check
+                    mix esbuild oraculo --minify --no-deps-check
                     mix phx.digest --no-deps-check
                 '';
             };

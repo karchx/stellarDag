@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: 192.168.0.9:32000/stellar-operator
-  newTag: v2
+  newTag: v4

@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/beam.stellar.dev_beamclusters.yaml
+- bases/beam.stellar.dev_beamwebapps.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

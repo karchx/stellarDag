@@ -1,9 +1,9 @@
 defmodule Coresup do
   require Logger
 
-  @erlang_node :"stellar@stivarch"
 
   def schedule_job(job_name, command_type \\ :bash, content, cron_expr) do
+    target_node = System.get_env("CORE_NODE", "stellar@stivarch")
     true = Node.connect(@erlang_node)
 
     erlang_payload = {command_type, to_charlist(content)}

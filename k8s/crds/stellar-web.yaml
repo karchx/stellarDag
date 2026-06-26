@@ -1,0 +1,11 @@
+apiVersion: beam.stellar.dev/v1alpha1
+kind: BeamWebApp
+metadata:
+  name: stellar-web
+  namespace: stellardag
+spec:
+  replicas: 1
+  image: 192.168.0.9:32000/stellar/web:latest
+  cookieSecret: oraculo-cookie-secret
+  secretKeyBase: stellar-secretkeybase
+  coreCluster: stellar-core

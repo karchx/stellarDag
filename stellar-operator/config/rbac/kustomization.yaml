@@ -22,6 +22,9 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the stellar-operator itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- beamwebapp_admin_role.yaml
+- beamwebapp_editor_role.yaml
+- beamwebapp_viewer_role.yaml
 - beamcluster_admin_role.yaml
 - beamcluster_editor_role.yaml
 - beamcluster_viewer_role.yaml

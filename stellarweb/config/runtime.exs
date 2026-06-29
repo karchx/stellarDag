@@ -16,6 +16,18 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base
 
+  config :libcluster,
+    topologies: [
+      k8s_dns_cluster: [
+        strategy: Cluster.Strategy.Kubernetes.DNSSRV,
+        config: [
+          service: System.fetch_env!("CORE_DNS"),
+          application_name: System.fetch_env!("CORE_NAME"),
+          polling_interval: 10_000
+        ]
+      ]
+    ]
+
   if System.get_env("PHX_SERVER") do
     config :oraculo, Oraculo.Endpoint, server: true
   end

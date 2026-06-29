@@ -52,6 +52,7 @@ defmodule Oraculo.MixProject do
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
       {:coresup, in_umbrella: true},
+      {:libcluster, "~> 3.5"}
     ]
 
     if Mix.env() == :dev do

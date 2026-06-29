@@ -47,7 +47,6 @@ config :tailwind,
     cd: Path.expand("../apps/oraculo", __DIR__)
   ]
 
-
 import Config
 
 # Configure Elixir's Logger

@@ -1,4 +1,4 @@
--sname stellar_core
+-name ${RELEASE_NODE}
 -setcookie ${RELEASE_COOKIE}
 +K true
 +A30

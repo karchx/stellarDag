@@ -5,5 +5,5 @@ metadata:
   namespace: stellardag
 spec:
   replicas: 3
-  image: 192.168.0.9:32000/stellar/core:latest
+  image: 192.168.0.9:32000/stellar/core:04903aa
   cookieSecret: oraculo-cookie-secret

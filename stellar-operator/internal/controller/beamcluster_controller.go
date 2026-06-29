@@ -111,6 +111,20 @@ func (r *BeamClusterReconciler) statefulSetForCluster(c *beamv1alpha1.BeamCluste
 								},
 							},
 							{
+								Name: "POD_NAME",
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+								},
+							},
+							{
+								Name:  "RELEASE_DISTRIBUTION",
+								Value: "name",
+							},
+							{
+								Name:  "RELEASE_NODE",
+								Value: fmt.Sprintf("stellar_core@$(POD_NAME).%s-headless.%s.svc.cluster.local", c.Name, c.Namespace),
+							},
+							{
 								Name: "RELEASE_COOKIE",
 								ValueFrom: &corev1.EnvVarSource{
 									SecretKeyRef: &corev1.SecretKeySelector{

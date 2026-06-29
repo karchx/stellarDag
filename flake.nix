@@ -45,7 +45,7 @@
                 version = "0.1.0";
                 src = ./stellarweb;
                 nativeBuildInputs = [ pkgs.git ];
-                hash = "sha256-RCTpNDxts5qmWeF/yrqk5QIyCjrdoGamamRePXWoC8g=";
+                hash = "sha256-O0U48orR59IO1sI8SK3sbRiQPDgRa5gEWrBBqRz3a1E=";
             };
             stellarweb = erlangPackages.mixRelease {
                 pname = "stellarweb";
@@ -121,22 +121,26 @@
                         
                         echo "🚀 Building OCI image with Nix..."
                         TAR_PATH=$(${pkgs.nix}/bin/nix build --no-link --print-out-paths .#stellar_core-image)
+                        COMMIT_HASH=$(${pkgs.git}/bin/git rev-parse --short HEAD)
+                        TAG="core:$COMMIT_HASH"
                         
                         echo "📦 Loading OCI image into local registry..."
-                        ${pkgs.skopeo}/bin/skopeo --insecure-policy copy --dest-tls-verify=false docker-archive:$TAR_PATH docker://${registry}/stellar/core:latest
+                        ${pkgs.skopeo}/bin/skopeo --insecure-policy copy --dest-tls-verify=false docker-archive:$TAR_PATH docker://${registry}/stellar/$TAG
                          
-                        echo "✅ Deployment successful! ${registry}/stellar/core:latest"
+                        echo "✅ Deployment successful! ${registry}/stellar/$TAG"
                     '')
                     (pkgs.writeShellScriptBin "deploy-stellar-web" ''
                         set -e
                         
                         echo "🚀 Building OCI image with Nix..."
                         TAR_PATH=$(${pkgs.nix}/bin/nix build --no-link --print-out-paths .#stellarweb-image)
+                        COMMIT_HASH=$(${pkgs.git}/bin/git rev-parse --short HEAD)
+                        TAG="web:$COMMIT_HASH"
                         
                         echo "📦 Loading OCI image into local registry..."
-                        ${pkgs.skopeo}/bin/skopeo --insecure-policy copy --dest-tls-verify=false docker-archive:$TAR_PATH docker://${registry}/stellar/web:latest
+                        ${pkgs.skopeo}/bin/skopeo --insecure-policy copy --dest-tls-verify=false docker-archive:$TAR_PATH docker://${registry}/stellar/$TAG
                          
-                        echo "✅ Deployment successful! ${registry}/stellar/web:latest"
+                        echo "✅ Deployment successful! ${registry}/stellar/$TAG"
                     '')
                 ];
             }; 

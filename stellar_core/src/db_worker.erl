@@ -28,9 +28,9 @@ start_link(Args) ->
 
 init(_Args) ->
     Config = #{
-        host => "localhost",
-        username => "postgres",
-        password => "postgres",
+        host => "postgres-postgresql.platform.svc.cluster.local",
+        username => "platform",
+        password => "changeme123",
         database => "stellar_core",
         timeout => 4000
     },

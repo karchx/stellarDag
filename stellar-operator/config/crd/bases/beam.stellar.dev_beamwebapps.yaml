@@ -41,7 +41,9 @@ spec:
             properties:
               cookieSecret:
                 type: string
-              coreCluster:
+              coreDns:
+                type: string
+              coreName:
                 type: string
               image:
                 type: string
@@ -54,7 +56,8 @@ spec:
                 type: string
             required:
             - cookieSecret
-            - coreCluster
+            - coreDns
+            - coreName
             - image
             - replicas
             - secretKeyBase

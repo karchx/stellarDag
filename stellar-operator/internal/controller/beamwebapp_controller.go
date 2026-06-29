@@ -93,7 +93,6 @@ func (r *BeamWebAppReconciler) serviceForWebApp(w *beamv1alpha1.BeamWebApp) *cor
 func (r *BeamWebAppReconciler) deploymentForWebApp(w *beamv1alpha1.BeamWebApp) *appsv1.Deployment {
 	replicas := w.Spec.Replicas
 	labels := map[string]string{"app": w.Name, "tier": "web"}
-	coreNodeDNS := fmt.Sprintf("%s-0.%s-headless.%s.svc.cluster.local", w.Spec.CoreClusterName, w.Spec.CoreClusterName, w.Namespace)
 
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -111,8 +110,26 @@ func (r *BeamWebAppReconciler) deploymentForWebApp(w *beamv1alpha1.BeamWebApp) *
 						Image: w.Spec.Image,
 						Env: []corev1.EnvVar{
 							{
-								Name:  "CORE_NODE",
-								Value: "stellar@" + coreNodeDNS,
+								Name: "POD_IP",
+								ValueFrom: &corev1.EnvVarSource{
+									FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+								},
+							},
+							{
+								Name:  "CORE_DNS",
+								Value: w.Spec.CoreDns,
+							},
+							{
+								Name:  "CORE_NAME",
+								Value: w.Spec.CoreName,
+							},
+							{
+								Name:  "RELEASE_DISTRIBUTION",
+								Value: "name",
+							},
+							{
+								Name:  "RELEASE_NODE",
+								Value: "stellarweb@$(POD_IP)",
 							},
 							{
 								Name: "RELEASE_COOKIE",

@@ -8,15 +8,12 @@ import (
 type BeamWebAppSpec struct {
 	// Replicas define total nodes
 	// +kubebuilder:validation:Minimum=1
-	Replicas int32 `json:"replicas"`
-
-	Image string `json:"image"`
-
-	CookieSecret string `json:"cookieSecret"`
-
+	Replicas      int32  `json:"replicas"`
+	Image         string `json:"image"`
+	CookieSecret  string `json:"cookieSecret"`
 	SecretKeyBase string `json:"secretKeyBase"`
-
-	CoreClusterName string `json:"coreCluster"`
+	CoreDns       string `json:"coreDns"`
+	CoreName      string `json:"coreName"`
 }
 
 type BeamWebAppStatus struct {

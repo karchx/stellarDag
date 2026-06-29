@@ -5,7 +5,8 @@ metadata:
   namespace: stellardag
 spec:
   replicas: 1
-  image: 192.168.0.9:32000/stellar/web:latest
+  image: 192.168.0.9:32000/stellar/web:d88f03f
   cookieSecret: oraculo-cookie-secret
   secretKeyBase: stellar-secretkeybase
-  coreCluster: stellar-core
+  coreDns: stellar-core-headless.stellardag.svc.cluster.local
+  coreName: stellar_core
